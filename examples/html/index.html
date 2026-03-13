@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErrorCatcher - 原生 HTML 示例</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #2c3e50; margin-top: 0; }
+    h2 { color: #34495e; font-size: 20px; margin-top: 0; }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      color: white;
+      transition: transform 0.2s;
+    }
+    button:hover { transform: translateY(-2px); }
+    .btn-danger { background: #e74c3c; }
+    .btn-warning { background: #f39c12; }
+    .btn-info { background: #3498db; }
+    .btn-success { background: #27ae60; }
+    .log {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    .log-item {
+      margin-bottom: 8px;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+    }
+    .log-time { color: #95a5a6; }
+    .log-type { 
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin: 0 8px;
+    }
+    .log-type.error { background: #e74c3c; }
+    .log-type.success { background: #27ae60; }
+    .log-type.info { background: #3498db; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚨 ErrorCatcher - 原生 HTML 示例</h1>
+    <p>这个示例展示了如何在原生 HTML 页面中使用 ErrorCatcher，无需任何框架。</p>
+  </div>
+
+  <div class="container">
+    <h2>1. 自动捕获错误</h2>
+    <p>这些错误会被 ErrorCatcher 自动拦截和上报</p>
+    <div class="btn-grid">
+      <button class="btn-danger" onclick="triggerJSError()">
+        JS 运行时错误
+      </button>
+      <button class="btn-warning" onclick="triggerPromiseError()">
+        Promise Rejection
+      </button>
+      <button class="btn-info" onclick="triggerFetchError()">
+        Fetch 错误
+      </button>
+      <button class="btn-info" onclick="triggerXHRError()">
+        XHR 错误
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>2. API 方法测试</h2>
+    <p>测试所有可用的 API 方法</p>
+    <div class="btn-grid">
+      <button class="btn-success" onclick="testSetUser()">
+        setUser() - 设置用户
+      </button>
+      <button class="btn-success" onclick="testSetTag()">
+        setTag() - 设置标签
+      </button>
+      <button class="btn-success" onclick="testSetTags()">
+        setTags() - 批量设置标签
+      </button>
+      <button class="btn-success" onclick="testSetContext()">
+        setContext() - 设置上下文
+      </button>
+      <button class="btn-success" onclick="testSetExtra()">
+        setExtra() - 设置额外数据
+      </button>
+      <button class="btn-success" onclick="testAddBreadcrumb()">
+        addBreadcrumb() - 添加面包屑
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>3. 手动上报错误</h2>
+    <div class="btn-grid">
+      <button class="btn-success" onclick="manualReport()">
+        report() - 手动上报错误
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>操作日志</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <!-- 引入 ErrorCatcher UMD 版本 -->
+  <script src="../../dist/error-catcher.js"></script>
+  
+  <script>
+    // 初始化 ErrorCatcher
+    const tracker = new ErrorCatcher({
+      reportUrl: 'http://localhost:3001/api/errors/report',
+      projectId: '69ae7968cc87edb222a665dc',
+      apiKey: 'ec_a3f6bf3d2bf6378b8bf13ee9b1889fc3c2c42e5acbb55e27a8bda26cd3d17060',
+      environment: 'development',
+      debug: true
+    });
+
+    // 必须调用 init() 来启动监听
+    tracker.init();
+
+    // 日志函数
+    function addLog(type, message) {
+      const log = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      item.innerHTML = `
+        <span class="log-time">[${time}]</span>
+        <span class="log-type ${type}">${type.toUpperCase()}</span>
+        <span>${message}</span>
+      `;
+      log.insertBefore(item, log.firstChild);
+    }
+
+    // 测试函数
+    function triggerJSError() {
+      addLog('error', '触发 JS 运行时错误...');
+      setTimeout(() => {
+        const obj = null;
+        obj.property.value = 'test'; // 抛出错误
+      }, 100);
+    }
+
+    function triggerPromiseError() {
+      addLog('error', '触发 Promise Rejection...');
+      Promise.reject(new Error('测试 Promise Rejection'));
+    }
+
+    function triggerFetchError() {
+      addLog('info', '触发 Fetch 错误...');
+      fetch('http://localhost:3001/api/test/non-existent')
+        .then(response => {
+          if (!response.ok) {
+            addLog('error', `Fetch 错误: ${response.status}`);
+          }
+        })
+        .catch(error => {
+          addLog('error', `Fetch 失败: ${error.message}`);
+        });
+    }
+
+    function triggerXHRError() {
+      addLog('info', '触发 XHR 错误...');
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'http://localhost:3001/api/test/xhr-error');
+      xhr.onload = function() {
+        if (xhr.status >= 400) {
+          addLog('error', `XHR 错误: ${xhr.status}`);
+        }
+      };
+      xhr.onerror = function() {
+        addLog('error', 'XHR 网络错误');
+      };
+      xhr.send();
+    }
+
+    // API 方法测试
+    function testSetUser() {
+      addLog('info', '测试 setUser()...');
+      tracker.setUser({
+        id: 'user_' + Date.now(),
+        username: 'john_doe',
+        email: 'john@example.com',
+        role: 'admin'
+      });
+      addLog('success', '✓ setUser() 已调用');
+    }
+
+    function testSetTag() {
+      addLog('info', '测试 setTag()...');
+      tracker.setTag('environment', 'development');
+      tracker.setTag('version', '2.0.0');
+      addLog('success', '✓ setTag() 已调用');
+    }
+
+    function testSetTags() {
+      addLog('info', '测试 setTags()...');
+      tracker.setTags({
+        feature: 'checkout',
+        region: 'us-west',
+        build: '12345'
+      });
+      addLog('success', '✓ setTags() 已调用');
+    }
+
+    function testSetContext() {
+      addLog('info', '测试 setContext()...');
+      tracker.setContext('device', {
+        type: 'desktop',
+        os: 'macOS',
+        browser: 'Chrome'
+      });
+      addLog('success', '✓ setContext() 已调用');
+    }
+
+    function testSetExtra() {
+      addLog('info', '测试 setExtra()...');
+      tracker.setExtra('lastAction', 'button_click');
+      tracker.setExtra('timestamp', Date.now());
+      addLog('success', '✓ setExtra() 已调用');
+    }
+
+    function testAddBreadcrumb() {
+      addLog('info', '测试 addBreadcrumb()...');
+      tracker.addBreadcrumb({
+        category: 'user',
+        message: 'User clicked test button',
+        level: 'info',
+        data: { button: 'addBreadcrumb' }
+      });
+      addLog('success', '✓ addBreadcrumb() 已调用');
+    }
+
+    function manualReport() {
+      addLog('info', '手动上报错误...');
+      tracker.report(new Error('这是一个手动上报的自定义错误'), {
+        type: 'custom_error',
+        level: 'warning',
+        tags: { source: 'manual' },
+        extra: {
+          action: 'button_click',
+          component: 'manual_report'
+        }
+      });
+      addLog('success', '✓ 错误已上报');
+    }
+
+    // 页面加载完成
+    addLog('success', '✅ ErrorCatcher 已初始化');
+    addLog('info', '点击按钮测试错误捕获功能');
+    
+    // 打印调试信息
+    console.log('[ErrorCatcher] 配置:', {
+      reportUrl: tracker.config.reportUrl,
+      projectId: tracker.config.projectId,
+      debug: tracker.config.debug
+    });
+  </script>
+</body>
+</html>

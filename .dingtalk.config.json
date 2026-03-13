@@ -1,0 +1,9 @@
+{
+  "webhook": "https://oapi.dingtalk.com/robot/send?access_token=fe18138e8544cb9c1f9e3f01be2697a579fea8e313456e3188d0987ad0b1b92b",
+  "secret": "SEC9ac877af1cb7bbc3d688ad8c01309b8f11b8c271e719fc650197f5daed4aecf6",
+  "atMobiles": [],
+  "atAll": false,
+  "description": "ErrorCatcher 钉钉通知配置",
+  "testStatus": "✅ 已测试通过",
+  "testDate": "2026-03-04"
+}

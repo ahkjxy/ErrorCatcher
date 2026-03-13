@@ -1,0 +1,52 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+coverage/
+.vscode/
+.idea/
+*.swp
+*.swo
+.cache/
+admin/dist/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Backups
+backups/
+*.tar.gz
+*.archive
+
+# Logs
+logs/
+*.log.*
+
+# Build outputs
+build/
+out/
+
+# Package manager lock files (optional, uncomment if needed)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/

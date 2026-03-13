@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # MongoDB 数据库
+  mongodb:
+    image: mongo:7.0
+    container_name: error-catcher-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
+      MONGO_INITDB_DATABASE: error-catcher
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - error-catcher-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Server
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: error-catcher-api
+    restart: always
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      MONGODB_URI: mongodb://error_catcher_user:${DB_PASSWORD:-password123}@mongodb:27017/error-catcher?authSource=error-catcher
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DINGTALK_WEBHOOK: ${DINGTALK_WEBHOOK:-}
+      DINGTALK_SECRET: ${DINGTALK_SECRET:-}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+      - api_logs:/app/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - error-catcher-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Admin Dashboard
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: error-catcher-admin
+    restart: always
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+      VITE_WS_URL: ${VITE_WS_URL:-http://localhost:3001}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./admin:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    networks:
+      - error-catcher-network
+
+networks:
+  error-catcher-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  api_logs:
+    driver: local

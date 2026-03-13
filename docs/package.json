@@ -1,0 +1,15 @@
+{
+  "name": "error-catcher-docs",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.0.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-x64": "^4.59.0"
+  }
+}

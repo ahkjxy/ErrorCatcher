@@ -1,0 +1,27 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env.local
+coverage/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 开发文件
+api/
+admin/
+docs/
+examples/
+tests/
+
+# 配置文件
+.gitignore
+.eslintrc.js
+.prettierrc
+rollup.config.js
+
+# 文档
+CONTRIBUTING.md
+CHANGELOG.md

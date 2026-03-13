@@ -1,0 +1,46 @@
+{
+  "name": "error-catcher-admin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite --mode development",
+    "dev:test": "vite --mode test",
+    "dev:pre": "vite --mode pre",
+    "dev:prod": "vite --mode production",
+    "build": "vite build --mode production",
+    "build:dev": "vite build --mode development",
+    "build:test": "vite build --mode test",
+    "build:pre": "vite build --mode pre",
+    "build:prod": "vite build --mode production",
+    "preview": "vite preview",
+    "preview:test": "vite preview --mode test",
+    "preview:pre": "vite preview --mode pre",
+    "preview:prod": "vite preview --mode production",
+    "setup:error-project": "cd ../api && node scripts/setup-admin-project.js"
+  },
+  "dependencies": {
+    "@headlessui/vue": "^1.7.16",
+    "@heroicons/vue": "^2.0.18",
+    "axios": "^1.6.0",
+    "chart.js": "^4.5.1",
+    "dayjs": "^1.11.10",
+    "echarts": "^5.4.3",
+    "pinia": "^2.1.7",
+    "socket.io-client": "^4.8.3",
+    "vue": "^3.3.4",
+    "vue-chartjs": "^5.3.3",
+    "vue-echarts": "^6.6.1",
+    "vue-i18n": "^9.14.5",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.5.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "vite": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-x64": "^4.59.0"
+  }
+}

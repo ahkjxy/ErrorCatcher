@@ -1,0 +1,78 @@
+{
+  "name": "error-catcher",
+  "version": "1.0.0",
+  "description": "Universal error monitoring plugin for web applications",
+  "main": "dist/error-catcher.cjs.js",
+  "module": "dist/error-catcher.esm.js",
+  "browser": "dist/error-catcher.browser.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/error-catcher.esm.js",
+      "require": "./dist/error-catcher.cjs.js",
+      "browser": "./dist/error-catcher.browser.js",
+      "default": "./dist/error-catcher.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "plugins",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:dist": "node scripts/build.js",
+    "install:all": "npm install && cd api && npm install && cd ../admin && npm install && cd ../docs && npm install && cd ..",
+    "dev": "concurrently -n \"API,ADMIN,DOCS\" -c \"blue,green,yellow\" \"npm run dev:api\" \"npm run dev:admin\" \"npm run dev:docs\"",
+    "dev:api": "cd api && npm run dev",
+    "dev:admin": "cd admin && npm run dev",
+    "dev:docs": "cd docs && npm run dev",
+    "start": "npm run dev",
+    "build:admin": "cd admin && npm run build",
+    "build:docs": "cd docs && npm run build",
+    "test": "cd api && npm run test",
+    "clean": "rm -rf node_modules api/node_modules admin/node_modules docs/node_modules dist api/logs",
+    "setup": "npm run install:all && npm run setup:env",
+    "setup:env": "node scripts/setup-env.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "error-monitoring",
+    "error-tracking",
+    "error-reporting",
+    "vue",
+    "vue2",
+    "vue3",
+    "react",
+    "nuxt",
+    "nuxt2",
+    "nuxt3",
+    "nextjs",
+    "next",
+    "jquery",
+    "php",
+    "ssr",
+    "monitoring",
+    "tracking",
+    "logging"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/error-catcher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/error-catcher/issues"
+  },
+  "homepage": "https://github.com/yourusername/error-catcher#readme",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "concurrently": "^8.2.2",
+    "rollup": "^4.9.0"
+  }
+}

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErrorCatcher - jQuery 示例</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #2c3e50; margin-top: 0; }
+    h2 { color: #34495e; font-size: 20px; margin-top: 0; }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      color: white;
+      transition: transform 0.2s;
+    }
+    button:hover { transform: translateY(-2px); }
+    .btn-danger { background: #e74c3c; }
+    .btn-info { background: #3498db; }
+    .btn-success { background: #27ae60; }
+    .log {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    .log-item {
+      margin-bottom: 8px;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+    }
+    .log-time { color: #95a5a6; }
+    .log-type { 
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin: 0 8px;
+    }
+    .log-type.error { background: #e74c3c; }
+    .log-type.success { background: #27ae60; }
+    .log-type.info { background: #3498db; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚨 ErrorCatcher - jQuery 示例</h1>
+    <p>这个示例展示了 ErrorCatcher 如何自动集成 jQuery，捕获 $.ajax 错误。</p>
+  </div>
+
+  <div class="container">
+    <h2>jQuery.ajax 错误测试</h2>
+    <p>ErrorCatcher 会自动检测 jQuery 并拦截 $.ajax 错误</p>
+    <div class="btn-grid">
+      <button class="btn-danger" id="test-ajax-404">
+        $.ajax 404 错误
+      </button>
+      <button class="btn-danger" id="test-ajax-500">
+        $.ajax 500 错误
+      </button>
+      <button class="btn-info" id="test-get-error">
+        $.get 错误
+      </button>
+      <button class="btn-info" id="test-post-error">
+        $.post 错误
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>操作日志</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <!-- 引入 jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  
+  <!-- 引入 ErrorCatcher UMD 版本 -->
+  <script src="../../dist/error-catcher.js"></script>
+  
+  <script>
+    // 初始化 ErrorCatcher
+    // jQuery 会被自动检测并集成
+    const tracker = new ErrorCatcher({
+      reportUrl: 'http://localhost:3001/api/errors/report',
+      projectId: '69ae7968cc87edb222a665dc',
+      apiKey: 'ec_a3f6bf3d2bf6378b8bf13ee9b1889fc3c2c42e5acbb55e27a8bda26cd3d17060',
+      environment: 'development',
+      debug: true,
+      jquery: window.jQuery  // 传入 jQuery 实例
+    });
+    
+    // 必须调用 init() 来启动监听
+    tracker.init();
+
+    // 日志函数
+    function addLog(type, message) {
+      const time = new Date().toLocaleTimeString();
+      $('#log').prepend(`
+        <div class="log-item">
+          <span class="log-time">[${time}]</span>
+          <span class="log-type ${type}">${type.toUpperCase()}</span>
+          <span>${message}</span>
+        </div>
+      `);
+    }
+
+    // 测试 $.ajax 404
+    $('#test-ajax-404').click(function() {
+      addLog('info', '测试 $.ajax 404 错误...');
+      $.ajax({
+        url: 'http://localhost:3001/api/test/not-found',
+        method: 'GET',
+        success: function() {
+          addLog('success', '请求成功');
+        },
+        error: function(xhr, status, error) {
+          addLog('error', `$.ajax 错误: ${xhr.status} ${error}`);
+        }
+      });
+    });
+
+    // 测试 $.ajax 500
+    $('#test-ajax-500').click(function() {
+      addLog('info', '测试 $.ajax 500 错误...');
+      $.ajax({
+        url: 'http://localhost:3001/api/test/server-error',
+        method: 'POST',
+        data: { test: 'data' },
+        error: function(xhr, status, error) {
+          addLog('error', `$.ajax 错误: ${xhr.status} ${error}`);
+        }
+      });
+    });
+
+    // 测试 $.get
+    $('#test-get-error').click(function() {
+      addLog('info', '测试 $.get 错误...');
+      $.get('http://localhost:3001/api/test/get-error')
+        .fail(function(xhr) {
+          addLog('error', `$.get 错误: ${xhr.status}`);
+        });
+    });
+
+    // 测试 $.post
+    $('#test-post-error').click(function() {
+      addLog('info', '测试 $.post 错误...');
+      $.post('http://localhost:3001/api/test/post-error', { data: 'test' })
+        .fail(function(xhr) {
+          addLog('error', `$.post 错误: ${xhr.status}`);
+        });
+    });
+
+    // 页面加载完成
+    $(document).ready(function() {
+      addLog('success', '✅ ErrorCatcher 已初始化');
+      addLog('success', '✅ jQuery 已自动集成');
+      addLog('info', '点击按钮测试 jQuery.ajax 错误捕获');
+      
+      // 打印调试信息
+      console.log('[ErrorCatcher] 配置:', {
+        reportUrl: tracker.config.reportUrl,
+        projectId: tracker.config.projectId,
+        debug: tracker.config.debug
+      });
+    });
+  </script>
+</body>
+</html>

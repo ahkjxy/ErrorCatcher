@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErrorCatcher - Vanilla JS Example</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>ErrorCatcher - Vanilla JS Example</h1>
+  
+  <div class="info">
+    <p>这个示例展示了如何在纯 JavaScript 项目中使用 ErrorCatcher。</p>
+    <p>打开浏览器控制台查看错误捕获日志。</p>
+  </div>
+
+  <div>
+    <button onclick="triggerJsError()">触发 JS 错误</button>
+    <button onclick="triggerPromiseError()">触发 Promise 错误</button>
+    <button onclick="triggerFetchError()">触发 Fetch 错误</button>
+    <button onclick="triggerXhrError()">触发 XHR 错误</button>
+    <button onclick="manualReport()">手动上报</button>
+  </div>
+
+  <script src="../../dist/error-catcher.js"></script>
+  <script>
+    // 初始化 ErrorCatcher
+    const tracker = new ErrorCatcher({
+      reportUrl: 'http://localhost:3001/api/errors/report',
+      projectId: '69ae7968cc87edb222a665dc',
+      apiKey: 'ec_a3f6bf3d2bf6378b8bf13ee9b1889fc3c2c42e5acbb55e27a8bda26cd3d17060',
+      environment: 'development',
+      debug: true,
+      userId: 'test-user-123',
+      context: {
+        page: 'index',
+        version: '1.0.0'
+      }
+    });
+
+    // 初始化
+    tracker.init();
+
+    // 触发 JS 错误
+    function triggerJsError() {
+      throw new Error('这是一个测试 JS 错误');
+    }
+
+    // 触发 Promise 错误
+    function triggerPromiseError() {
+      Promise.reject(new Error('这是一个测试 Promise 错误'));
+    }
+
+    // 触发 Fetch 错误
+    async function triggerFetchError() {
+      await fetch('http://localhost:3001/api/not-found');
+    }
+
+    // 触发 XHR 错误
+    function triggerXhrError() {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'http://localhost:3001/api/not-found');
+      xhr.send();
+    }
+
+    // 手动上报
+    function manualReport() {
+      tracker.report(new Error('手动上报的错误'), {
+        action: 'manual-report',
+        timestamp: new Date().toISOString()
+      });
+      alert('错误已手动上报！');
+    }
+  </script>
+</body>
+</html>

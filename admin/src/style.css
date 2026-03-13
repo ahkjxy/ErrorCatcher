@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Sentry S.C.R.A.P.S. 2025 主题色 */
+:root {
+  /* 主色调 - 更鲜艳的紫色/粉色 */
+  --primary-50: #fdf4ff;
+  --primary-100: #fae8ff;
+  --primary-200: #f5d0fe;
+  --primary-300: #f0abfc;
+  --primary-400: #e879f9;
+  --primary-500: #d946ef;
+  --primary-600: #c026d3;
+  --primary-700: #a21caf;
+  --primary-800: #86198f;
+  --primary-900: #701a75;
+  
+  /* Sentry 品牌色 */
+  --sentry-purple: #6c5fc7;
+  --sentry-pink: #f55459;
+  --sentry-yellow: #f9a66d;
+  
+  /* 语义颜色 - 更鲜艳 */
+  --error: #f43f5e;
+  --warning: #fb923c;
+  --success: #22c55e;
+  --info: #3b82f6;
+  
+  /* 中性色 */
+  --gray-50: #fafafa;
+  --gray-100: #f4f4f5;
+  --gray-200: #e4e4e7;
+  --gray-300: #d4d4d8;
+  --gray-800: #27272a;
+  --gray-900: #18181b;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-900 text-gray-100;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+  }
+}
+
+@layer components {
+  /* 卡片样式 - Sentry S.C.R.A.P.S. 风格 */
+  .card {
+    @apply bg-gray-800 rounded-xl shadow-lg border border-gray-700 transition-all duration-200;
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+  
+  .card:hover {
+    @apply shadow-xl;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+  }
+  
+  /* 按钮样式 - Sentry S.C.R.A.P.S. 立体风格 */
+  .btn {
+    @apply px-4 py-2.5 rounded-lg font-semibold transition-all duration-200 relative;
+    box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 0 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn-primary {
+    @apply text-white;
+    background: linear-gradient(135deg, #d946ef 0%, #c026d3 100%);
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #e879f9 0%, #d946ef 100%);
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 border border-gray-300;
+  }
+  
+  .btn-secondary:hover {
+    @apply bg-gray-200;
+  }
+  
+  .btn-danger {
+    @apply text-white;
+    background: linear-gradient(135deg, #f43f5e 0%, #dc2626 100%);
+  }
+  
+  .btn-danger:hover {
+    background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+  }
+  
+  .btn-success {
+    @apply text-white;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  }
+  
+  .btn-success:hover {
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+  }
+  
+  .btn-warning {
+    @apply text-white;
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  }
+  
+  .btn-warning:hover {
+    background: linear-gradient(135deg, #fdba74 0%, #fb923c 100%);
+  }
+  
+  /* 输入框样式 - 内凹效果 */
+  .input {
+    @apply w-full px-4 py-2.5 border-2 border-gray-600 rounded-lg outline-none transition-all;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+  }
+  
+  .input:focus {
+    @apply border-fuchsia-500;
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(217, 70, 239, 0.1);
+  }
+  
+  /* 标签样式 - Sentry 风格 */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  
+  .badge-error {
+    @apply bg-red-100 text-red-700 border border-red-200;
+  }
+  
+  .badge-warning {
+    @apply bg-orange-100 text-orange-700 border border-orange-200;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 text-blue-700 border border-blue-200;
+  }
+  
+  .badge-success {
+    @apply bg-green-100 text-green-700 border border-green-200;
+  }
+  
+  .badge-purple {
+    @apply bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200;
+  }
+}
+
+@layer utilities {
+  /* 滚动条样式 */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+  
+  /* 侧边栏过渡动画 */
+  .sidebar-transition {
+    transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+                margin 300ms cubic-bezier(0.4, 0, 0.2, 1),
+                padding 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* 淡入淡出动画 */
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: opacity 200ms ease;
+  }
+  
+  .fade-enter-from,
+  .fade-leave-to {
+    opacity: 0;
+  }
+  
+  /* 提示框动画 */
+  .tooltip-enter-active,
+  .tooltip-leave-active {
+    transition: opacity 150ms ease, transform 150ms ease;
+  }
+  
+  .tooltip-enter-from,
+  .tooltip-leave-to {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+}
+
+/* 全局滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* 代码块样式 - Sentry 风格 */
+pre {
+  @apply bg-gray-900 text-gray-100 rounded-xl p-4 overflow-x-auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  box-shadow: inset 0 2px 8px 0 rgba(0, 0, 0, 0.3);
+}
+
+code {
+  @apply text-sm;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+/* 链接样式 */
+a {
+  @apply text-fuchsia-600 hover:text-fuchsia-700 transition-colors font-medium;
+}
+
+/* 空状态样式 */
+.empty-state {
+  @apply text-center py-12;
+}
+
+.empty-state-icon {
+  @apply mx-auto h-12 w-12 text-gray-400;
+}
+
+.empty-state-title {
+  @apply mt-2 text-sm font-medium text-gray-900;
+}
+
+.empty-state-description {
+  @apply mt-1 text-sm text-gray-500;
+}

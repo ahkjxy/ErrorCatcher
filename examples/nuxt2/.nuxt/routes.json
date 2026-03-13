@@ -1,0 +1,14 @@
+[
+  {
+    "name": "test-real-api",
+    "path": "/test-real-api",
+    "component": "/Users/liaoyuan/Desktop/works/ErrorCatcher/examples/nuxt2/pages/test-real-api.vue",
+    "chunkName": "pages/test-real-api"
+  },
+  {
+    "name": "index",
+    "path": "/",
+    "component": "/Users/liaoyuan/Desktop/works/ErrorCatcher/examples/nuxt2/pages/index.vue",
+    "chunkName": "pages/index"
+  }
+]
