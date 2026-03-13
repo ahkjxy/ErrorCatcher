@@ -186,11 +186,13 @@ yarn add error-catcher-sdk
 import ErrorCatcher from 'error-catcher-sdk';
 
 // Initialize
-ErrorCatcher.init({
+const errorCatcher = new ErrorCatcher({
+  reportUrl: 'http://localhost:3001/api/errors/report',
   apiKey: 'your-project-api-key',
-  apiUrl: 'http://localhost:3001',
+  projectId: 'your-project-id',
   environment: 'production',
-  release: '1.0.0'
+  release: '1.0.0',
+  debug: false
 });
 
 // Errors are automatically captured
@@ -198,11 +200,51 @@ ErrorCatcher.init({
 try {
   // Your code
 } catch (error) {
-  ErrorCatcher.captureException(error, {
+  errorCatcher.report(error, {
+    type: 'manual',
     tags: { feature: 'payment' },
     extra: { userId: '123' }
   });
 }
+```
+
+### Configuration Options
+
+```javascript
+new ErrorCatcher({
+  // Required
+  reportUrl: 'http://localhost:3001/api/errors/report',  // Error reporting endpoint
+  apiKey: 'your-api-key',                                 // Project API key
+  projectId: 'your-project-id',                           // Project ID
+  
+  // Optional
+  environment: 'production',      // Environment name
+  release: '1.0.0',              // Release version
+  sampleRate: 1,                 // Error sampling rate (0-1)
+  maxBatchSize: 10,              // Max errors per batch
+  delay: 1000,                   // Batch send delay (ms)
+  maxRetries: 3,                 // Max retry attempts
+  debug: false,                  // Enable debug logging
+  autoStart: true,               // Auto initialize
+  autoIntegrate: true,           // Auto detect frameworks
+  
+  // Framework integration
+  vue: null,                     // Vue instance
+  react: false,                  // Enable React integration
+  axios: null,                   // Axios instance
+  jquery: false,                 // Enable jQuery integration
+  router: null,                  // Router instance
+  
+  // Hooks
+  beforeSend: (error) => error,  // Modify error before sending
+  onError: (error) => {},        // Called when error captured
+  
+  // Filtering
+  ignoreUrls: [                  // URLs to ignore
+    /\.(jpg|jpeg|png|gif|svg|css|woff|woff2|ttf|eot)$/i,
+    '/favicon.ico'
+  ]
+});
 ```
 
 ### Framework Integration
@@ -211,38 +253,184 @@ try {
 ```javascript
 import { createApp } from 'vue';
 import ErrorCatcher from 'error-catcher-sdk';
+import App from './App.vue';
 
 const app = createApp(App);
 
-ErrorCatcher.init({
+// Initialize with Vue instance
+new ErrorCatcher({
+  reportUrl: 'http://localhost:3001/api/errors/report',
   apiKey: 'your-api-key',
-  apiUrl: 'http://localhost:3001',
-  vue: app
+  projectId: 'your-project-id',
+  vue: app,  // Pass Vue instance
+  environment: 'production'
 });
+
+app.mount('#app');
+```
+
+**Vue 2**
+```javascript
+import Vue from 'vue';
+import ErrorCatcher from 'error-catcher-sdk';
+
+new ErrorCatcher({
+  reportUrl: 'http://localhost:3001/api/errors/report',
+  apiKey: 'your-api-key',
+  projectId: 'your-project-id',
+  vue: Vue,  // Pass Vue constructor
+  environment: 'production'
+});
+
+new Vue({
+  render: h => h(App)
+}).$mount('#app');
 ```
 
 **React**
 ```javascript
 import ErrorCatcher from 'error-catcher-sdk';
 
-ErrorCatcher.init({
+// Initialize at app entry
+new ErrorCatcher({
+  reportUrl: 'http://localhost:3001/api/errors/report',
   apiKey: 'your-api-key',
-  apiUrl: 'http://localhost:3001'
+  projectId: 'your-project-id',
+  react: true,
+  environment: 'production'
 });
 
-// Use ErrorBoundary component
-import { ErrorBoundary } from 'error-catcher-sdk/react';
+// React errors will be captured automatically
 ```
 
 **Nuxt 3**
 ```javascript
-// plugins/error-catcher.js
+// plugins/error-catcher.client.js
 export default defineNuxtPlugin((nuxtApp) => {
-  ErrorCatcher.init({
-    apiKey: 'your-api-key',
-    apiUrl: 'http://localhost:3001'
-  });
+  if (process.client) {
+    const ErrorCatcher = require('error-catcher-sdk').default;
+    
+    new ErrorCatcher({
+      reportUrl: 'http://localhost:3001/api/errors/report',
+      apiKey: 'your-api-key',
+      projectId: 'your-project-id',
+      vue: nuxtApp.vueApp,
+      environment: 'production'
+    });
+  }
 });
+```
+
+**Nuxt 2**
+```javascript
+// plugins/error-catcher.js
+import ErrorCatcher from 'error-catcher-sdk';
+
+export default ({ app }, inject) => {
+  new ErrorCatcher({
+    reportUrl: 'http://localhost:3001/api/errors/report',
+    apiKey: 'your-api-key',
+    projectId: 'your-project-id',
+    vue: app,
+    environment: 'production'
+  });
+};
+```
+
+**Axios Integration**
+```javascript
+import axios from 'axios';
+import ErrorCatcher from 'error-catcher-sdk';
+
+new ErrorCatcher({
+  reportUrl: 'http://localhost:3001/api/errors/report',
+  apiKey: 'your-api-key',
+  projectId: 'your-project-id',
+  axios: axios,  // Pass axios instance
+  environment: 'production'
+});
+
+// All axios errors will be automatically captured
+```
+
+**jQuery**
+```javascript
+import ErrorCatcher from 'error-catcher-sdk';
+
+new ErrorCatcher({
+  reportUrl: 'http://localhost:3001/api/errors/report',
+  apiKey: 'your-api-key',
+  projectId: 'your-project-id',
+  jquery: true,  // Enable jQuery integration
+  environment: 'production'
+});
+
+// All $.ajax errors will be automatically captured
+```
+
+### Advanced Usage
+
+**Set User Context**
+```javascript
+errorCatcher.setUser({
+  id: '12345',
+  username: 'john_doe',
+  email: 'john@example.com'
+});
+```
+
+**Add Tags**
+```javascript
+// Single tag
+errorCatcher.setTag('page', 'checkout');
+
+// Multiple tags
+errorCatcher.setTags({
+  feature: 'payment',
+  version: '2.0.0'
+});
+```
+
+**Add Context**
+```javascript
+errorCatcher.setContext('payment', {
+  amount: 99.99,
+  currency: 'USD',
+  method: 'credit_card'
+});
+```
+
+**Add Extra Data**
+```javascript
+errorCatcher.setExtra('orderDetails', {
+  orderId: 'ORD-12345',
+  items: 3,
+  total: 299.97
+});
+```
+
+**Add Breadcrumbs**
+```javascript
+errorCatcher.addBreadcrumb({
+  category: 'navigation',
+  message: 'User navigated to checkout',
+  level: 'info',
+  data: { from: '/cart', to: '/checkout' }
+});
+```
+
+**Manual Error Reporting**
+```javascript
+try {
+  // Your code
+  throw new Error('Something went wrong');
+} catch (error) {
+  errorCatcher.report(error, {
+    type: 'manual',
+    tags: { feature: 'payment' },
+    extra: { step: 'processing' }
+  });
+}
 ```
 
 For more examples, see [examples/](examples/) directory.
