@@ -19,6 +19,7 @@ const notificationRoutes = require('./routes/notifications');
 const templateRoutes = require('./routes/templates');
 const aiAnalysisRoutes = require('./routes/aiAnalysis');
 const aiConfigRoutes = require('./routes/aiConfig');
+const chatSessionRoutes = require('./routes/chatSessions');
 const testRoutes = require('./routes/test');
 const { connectDB } = require('./db');
 const alertService = require('./services/alertService');
@@ -68,9 +69,10 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/notifications/templates', templateRoutes);
-app.use('/api/ai/config', aiConfigRoutes); // 更具体的路由要放在前面
+app.use('/api/ai/config', aiConfigRoutes);
 app.use('/api/ai', aiAnalysisRoutes);
-app.use('/api/test', testRoutes); // 测试路由
+app.use('/api/chat-sessions', chatSessionRoutes);
+app.use('/api/test', testRoutes);
 
 // 健康检查
 app.get('/health', (req, res) => {
