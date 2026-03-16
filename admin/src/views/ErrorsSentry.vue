@@ -166,12 +166,15 @@
             </div>
 
             <!-- 状态标签 -->
-            <div class="flex-shrink-0">
+            <div class="flex-shrink-0 text-right">
               <span
                 v-if="error.resolved"
-                class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded"
+                class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded block"
               >
                 {{ t('errors.resolved') }}
+              </span>
+              <span v-if="error.resolved && error.resolvedBy" class="text-xs text-gray-500 mt-1 block">
+                by {{ error.resolvedBy }}
               </span>
             </div>
           </div>

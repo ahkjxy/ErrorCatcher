@@ -328,14 +328,17 @@ router.patch('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: '无权修改此错误' });
     }
 
-    const { resolved, notes, resolvedBy } = req.body;
+    const { resolved, notes } = req.body;
     
     const updateData = {};
     if (resolved !== undefined) {
       updateData.resolved = resolved;
       if (resolved) {
         updateData.resolvedAt = new Date();
-        if (resolvedBy) updateData.resolvedBy = resolvedBy;
+        updateData.resolvedBy = req.user.username || req.user.email;
+      } else {
+        updateData.resolvedAt = null;
+        updateData.resolvedBy = null;
       }
     }
     if (notes) updateData.notes = notes;
@@ -367,14 +370,14 @@ router.patch('/:id/resolve', authenticate, async (req, res) => {
       return res.status(403).json({ error: '无权修改此错误' });
     }
 
-    const { notes, resolvedBy } = req.body;
+    const { notes } = req.body;
 
     const updatedError = await Error.findByIdAndUpdate(
       req.params.id,
       {
         resolved: true,
         resolvedAt: new Date(),
-        resolvedBy,
+        resolvedBy: req.user.username || req.user.email,
         notes
       },
       { new: true }

@@ -88,6 +88,7 @@ router.get('/', authenticate, async (req, res) => {
         .limit(pageLimit)
         .populate('sampleEvent')
         .populate('assignedTo', 'username email')
+        .populate('resolvedBy', 'username email')
         .populate('projectId', 'name')
         .lean(),
       Issue.countDocuments(filter)
@@ -144,6 +145,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const issue = await Issue.findById(req.params.id)
       .populate('sampleEvent')
       .populate('assignedTo', 'username email')
+      .populate('resolvedBy', 'username email')
       .populate({
         path: 'projectId',
         select: 'name owner createdBy',
@@ -283,7 +285,8 @@ router.put('/:id', authenticate, async (req, res) => {
       req.params.id,
       updateData,
       { new: true }
-    ).populate('assignedTo', 'username email');
+    ).populate('assignedTo', 'username email')
+     .populate('resolvedBy', 'username email');
 
     res.json(issue);
   } catch (error) {

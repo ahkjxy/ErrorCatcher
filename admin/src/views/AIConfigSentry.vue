@@ -347,7 +347,7 @@
             <button
               type="button"
               @click="testConfig"
-              :disabled="testingConfig || (!configForm.apiKey && !configForm.hasApiKey)"
+              :disabled="testingConfig || (!configForm.apiKey && !configForm.hasApiKey && !editingConfig)"
               class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
             >
               {{ testingConfig ? t('ai.testing') : t('ai.testConnection') }}
@@ -521,43 +521,46 @@ const saveConfig = async () => {
 const testConfig = async () => {
   testingConfig.value = true;
   try {
-    const testPayload = {
-      provider: configForm.provider,
-      model: configForm.model,
-      apiUrl: configForm.apiUrl,
-      extraConfig: {}
-    };
-    
-    // 如果表单中有新的 API Key，使用新的；否则使用已保存的
-    if (configForm.apiKey) {
-      testPayload.apiKey = configForm.apiKey;
-    } else if (!configForm.hasApiKey) {
-      showToast(t('ai.pleaseEnterApiKey'), 'warning');
-      return;
-    }
-    
-    // 文心一言需要 Secret Key
-    if (configForm.provider === 'wenxin') {
-      if (configForm.secretKey) {
+    let testPayload = {};
+
+    // 编辑已有配置时：如果没有输入新 key，直接用 configId 测试已保存的配置
+    if (editingConfig.value && !configForm.apiKey) {
+      testPayload = { configId: editingConfig.value._id };
+    } else {
+      // 新建或输入了新 key 时，用表单数据测试
+      if (!configForm.apiKey) {
+        showToast(t('ai.pleaseEnterApiKey'), 'warning');
+        return;
+      }
+      testPayload = {
+        provider: configForm.provider,
+        model: configForm.model,
+        apiUrl: configForm.apiUrl,
+        apiKey: configForm.apiKey,
+        extraConfig: {}
+      };
+
+      // 文心一言需要 Secret Key
+      if (configForm.provider === 'wenxin') {
+        if (!configForm.secretKey) {
+          showToast(t('ai.wenxinNeedsSecretKey'), 'warning');
+          return;
+        }
         testPayload.extraConfig.secretKey = configForm.secretKey;
-      } else if (!editingConfig.value?.extraConfig?.secretKey) {
-        showToast(t('ai.wenxinNeedsSecretKey'), 'warning');
-        return;
       }
-    }
-    
-    // MiniMax 需要 Group ID
-    if (configForm.provider === 'minimax') {
-      if (configForm.groupId) {
+
+      // MiniMax 需要 Group ID
+      if (configForm.provider === 'minimax') {
+        if (!configForm.groupId) {
+          showToast(t('ai.minimaxNeedsGroupId'), 'warning');
+          return;
+        }
         testPayload.extraConfig.groupId = configForm.groupId;
-      } else if (!editingConfig.value?.extraConfig?.groupId) {
-        showToast(t('ai.minimaxNeedsGroupId'), 'warning');
-        return;
       }
     }
-    
+
     const { data } = await axios.post('/api/ai/config/test', testPayload);
-    
+
     if (data.success) {
       showToast(data.message || t('ai.testSuccess'), 'success');
     } else {
@@ -566,7 +569,6 @@ const testConfig = async () => {
   } catch (error) {
     const errorMsg = error.response?.data?.message || error.response?.data?.error || t('ai.testFailed');
     showToast(errorMsg, 'error');
-    
     if (error.response?.data?.details) {
       console.error('Test failed details:', error.response.data.details);
     }

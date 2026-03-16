@@ -99,18 +99,20 @@ async function testAIConnection(config) {
         
       case 'zhipu':
       case 'qwen':
+        console.log(`[AI Test] 请求 ${provider} API: ${apiUrl}, model: ${model}`);
         const zhipuResponse = await axios.post(
           apiUrl,
           {
             model,
-            messages: [{ role: 'user', content: prompt }]
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 100
           },
           {
             headers: {
               'Authorization': `Bearer ${apiKey}`,
               'Content-Type': 'application/json'
             },
-            timeout: 15000
+            timeout: 30000
           }
         );
         const content = zhipuResponse.data.choices?.[0]?.message?.content || 
@@ -150,8 +152,23 @@ async function testAIConnection(config) {
         errorMessage = error.response.data.message;
       }
     } else if (error.request) {
-      errorMessage = '无法连接到 AI 服务，请检查网络和 API URL';
-      errorDetails = { type: 'network_error' };
+      // 网络层错误，打印详细信息帮助诊断
+      console.error('网络请求失败详情:', {
+        url: apiUrl,
+        provider,
+        errorCode: error.code,
+        errorMessage: error.message
+      });
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = `连接超时（15s），请检查 API URL 是否可访问: ${apiUrl}`;
+      } else if (error.code === 'ENOTFOUND') {
+        errorMessage = `DNS 解析失败，无法解析域名: ${apiUrl}`;
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = `连接被拒绝: ${apiUrl}`;
+      } else {
+        errorMessage = `网络错误 (${error.code || 'unknown'}): 无法连接到 ${apiUrl}`;
+      }
+      errorDetails = { type: 'network_error', code: error.code, url: apiUrl };
     }
     
     return {
@@ -291,8 +308,11 @@ const AI_PROVIDERS = {
   zhipu: {
     name: '智谱 AI (Zhipu)',
     models: [
-      { value: 'glm-5', label: 'GLM-5 (最新)', description: '2026 年全球榜单前列，国产闭源代表，综合性能强劲' },
-      { value: 'glm-4-air', label: 'GLM-4 Air', description: '高性价比版本，适合大规模应用' }
+      { value: 'glm-4.6', label: 'GLM-4.6 (最新推荐)', description: '2025年最新版本，200K上下文，编程/推理/Agent能力全面提升' },
+      { value: 'glm-4.7', label: 'GLM-4.7', description: '高性能版本' },
+      { value: 'glm-4-air', label: 'GLM-4 Air', description: '高性价比版本，适合大规模应用' },
+      { value: 'glm-4-flash', label: 'GLM-4 Flash (免费)', description: '免费快速版本，适合轻量任务' },
+      { value: 'glm-5', label: 'GLM-5', description: '旗舰版本' }
     ],
     defaultUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     fields: [

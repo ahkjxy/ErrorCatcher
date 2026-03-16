@@ -59,6 +59,10 @@
           >
             {{ t(`issues.status.${issue.status}`) }}
           </span>
+          <span v-if="issue.status === 'resolved' && issue.resolvedBy" class="text-xs text-gray-500">
+            by {{ issue.resolvedBy?.username || issue.resolvedBy }}
+            <span v-if="issue.resolvedAt"> · {{ formatDate(issue.resolvedAt) }}</span>
+          </span>
           <span class="text-xs text-gray-500">{{ issue.shortId }}</span>
         </div>
         <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ issue.title }}</h1>
@@ -130,6 +134,15 @@
             <div class="text-sm text-gray-600 mb-1">{{ t('errors.lastSeen') }}</div>
             <div class="text-sm font-medium text-gray-900">{{ formatDate(issue.lastSeen) }}</div>
           </div>
+        </div>
+
+        <!-- Resolved by info -->
+        <div v-if="issue.status === 'resolved' && issue.resolvedBy" class="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {{ t('errors.resolved') }} by {{ issue.resolvedBy?.username || issue.resolvedBy }}
+          <span v-if="issue.resolvedAt" class="text-green-600">· {{ formatDate(issue.resolvedAt) }}</span>
         </div>
 
         <!-- Stack Trace -->
@@ -421,6 +434,7 @@ const updateStatus = async (status) => {
   try {
     await axios.put(`/api/issues/${route.params.id}`, { status });
     showToast(t(`issues.issue${status.charAt(0).toUpperCase() + status.slice(1)}`), 'success');
+    // Re-fetch to get updated resolvedBy info
     fetchIssueDetail();
   } catch (error) {
     console.error('Failed to update status:', error);

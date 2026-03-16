@@ -160,16 +160,19 @@
             </div>
 
             <!-- 状态标签 -->
-            <div class="flex-shrink-0">
+            <div class="flex-shrink-0 text-right">
               <span
                 v-if="issue.status === 'resolved'"
-                class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded"
+                class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded block"
               >
                 {{ t('errors.resolved') }}
               </span>
+              <span v-if="issue.status === 'resolved' && issue.resolvedBy" class="text-xs text-gray-500 mt-1 block">
+                by {{ issue.resolvedBy?.username || issue.resolvedBy }}
+              </span>
               <span
                 v-else-if="issue.status === 'ignored'"
-                class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded"
+                class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded block"
               >
                 {{ t('issues.ignored') }}
               </span>

@@ -30,6 +30,16 @@ router.get('/stats', authenticate, async (req, res) => {
       ? { projectId: new mongoose.Types.ObjectId(projectId) }
       : { projectId: { $in: allowedProjectIds.map(id => new mongoose.Types.ObjectId(id)) } };
 
+    // 时间范围：本周 vs 上周
+    const now = new Date();
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - 7);
+    thisWeekStart.setHours(0, 0, 0, 0);
+
+    const lastWeekStart = new Date(now);
+    lastWeekStart.setDate(now.getDate() - 14);
+    lastWeekStart.setHours(0, 0, 0, 0);
+
     // 并行获取所有数据
     const [
       totalIssues,
@@ -39,7 +49,14 @@ router.get('/stats', authenticate, async (req, res) => {
       errorTrendData,
       issueLevelData,
       affectedUsers,
-      alertStats
+      alertStats,
+      // 趋势对比数据
+      thisWeekErrors,
+      lastWeekErrors,
+      thisWeekIssues,
+      lastWeekIssues,
+      thisWeekUsers,
+      lastWeekUsers
     ] = await Promise.all([
       // 1. 总 Issues 数
       Issue.countDocuments(issueErrorFilter),
@@ -70,7 +87,20 @@ router.get('/stats', authenticate, async (req, res) => {
       getAffectedUsers(issueErrorFilter),
 
       // 8. 告警统计数据
-      getAlertStats(allowedProjectIds, projectId)
+      getAlertStats(allowedProjectIds, projectId),
+
+      // 9. 本周 Errors（用 error 数量做趋势，最直观）
+      Error.countDocuments({ ...issueErrorFilter, timestamp: { $gte: thisWeekStart } }),
+      // 10. 上周 Errors
+      Error.countDocuments({ ...issueErrorFilter, timestamp: { $gte: lastWeekStart, $lt: thisWeekStart } }),
+      // 11. 本周活跃 Issues（lastSeen 在本周内）
+      Issue.countDocuments({ ...issueErrorFilter, lastSeen: { $gte: thisWeekStart } }),
+      // 12. 上周活跃 Issues（lastSeen 在上周内）
+      Issue.countDocuments({ ...issueErrorFilter, lastSeen: { $gte: lastWeekStart, $lt: thisWeekStart } }),
+      // 13. 本周受影响用户
+      getAffectedUsersInRange(issueErrorFilter, thisWeekStart, now),
+      // 14. 上周受影响用户
+      getAffectedUsersInRange(issueErrorFilter, lastWeekStart, thisWeekStart)
     ]);
 
     // 为项目列表添加统计数据（方案 3：缓存）
@@ -100,15 +130,20 @@ router.get('/stats', authenticate, async (req, res) => {
       })
     );
 
-    // 计算趋势
+    // 计算趋势百分比（上周 -> 本周）
+    const calcTrend = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
     const stats = {
       totalIssues,
       totalErrors,
       affectedUsers,
       activeAlerts: alertStats.activeAlerts,
-      issuesTrend: 0,
-      errorsTrend: 0,
-      usersTrend: 0,
+      issuesTrend: calcTrend(thisWeekIssues, lastWeekIssues),
+      errorsTrend: calcTrend(thisWeekErrors, lastWeekErrors),
+      usersTrend: calcTrend(thisWeekUsers, lastWeekUsers),
       triggeredToday: alertStats.triggeredToday
     };
 
@@ -207,6 +242,34 @@ async function getAffectedUsers(projectFilter) {
     return result[0]?.totalUsers || 0;
   } catch (error) {
     console.error('Error fetching affected users:', error);
+    return 0;
+  }
+}
+
+// 辅助函数：获取指定时间范围内受影响的用户数
+async function getAffectedUsersInRange(projectFilter, startDate, endDate) {
+  try {
+    const result = await Error.aggregate([
+      {
+        $match: {
+          ...projectFilter,
+          timestamp: { $gte: startDate, $lt: endDate },
+          'user.id': { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: '$user.id'
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ]);
+
+    return result[0]?.total || 0;
+  } catch (error) {
+    console.error('Error fetching affected users in range:', error);
     return 0;
   }
 }
