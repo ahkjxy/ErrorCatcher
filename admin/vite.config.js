@@ -18,7 +18,13 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': {
           target: env.VITE_API_URL || 'http://localhost:3001',
-          changeOrigin: true
+          changeOrigin: true,
+          configure: (proxy) => {
+            // 禁用响应缓冲，确保 SSE 流式正常工作
+            proxy.on('proxyRes', (proxyRes) => {
+              proxyRes.headers['x-accel-buffering'] = 'no';
+            });
+          }
         }
       }
     },
