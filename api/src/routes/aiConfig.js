@@ -655,4 +655,178 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
+// AI 问答（SSE 流式）
+router.post('/chat', authenticate, authorize('admin'), async (req, res) => {
+  const { configId, message, history = [] } = req.body;
+  if (!message) return res.status(400).json({ error: '消息不能为空' });
+
+  const axios = require('axios');
+
+  // 加载配置
+  let config;
+  if (configId) {
+    config = await AIConfig.findById(configId);
+    if (!config) return res.status(404).json({ error: '配置不存在' });
+  } else {
+    config = await AIConfig.findOne({ enabled: true, isDefault: true });
+    if (!config) config = await AIConfig.findOne({ enabled: true });
+    if (!config) return res.status(400).json({ error: '没有可用的 AI 配置' });
+  }
+
+  const { provider, model, apiUrl, apiKey, extraConfig } = config;
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+  try {
+    const messages = [
+      { role: 'system', content: '你是一位专业的软件工程师和 AI 助手，擅长代码分析、错误排查和技术问答。' },
+      ...history.slice(-10),
+      { role: 'user', content: message }
+    ];
+
+    // Gemini 特殊处理
+    if (provider === 'gemini') {
+      const url = `${apiUrl}/gemini-pro:streamGenerateContent?key=${apiKey}&alt=sse`;
+      const geminiMessages = messages.filter(m => m.role !== 'system').map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+      const geminiRes = await axios.post(url, {
+        contents: geminiMessages,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+      }, { responseType: 'stream', timeout: 60000 });
+
+      geminiRes.data.on('data', (chunk) => {
+        const lines = chunk.toString().split('\n').filter(l => l.startsWith('data:'));
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line.slice(5));
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) send({ type: 'delta', content: text });
+          } catch {}
+        }
+      });
+      geminiRes.data.on('end', () => { send({ type: 'done' }); res.end(); });
+      geminiRes.data.on('error', () => { send({ type: 'error', message: '流式响应出错' }); res.end(); });
+      return;
+    }
+
+    // Claude 特殊处理
+    if (provider === 'claude') {
+      const claudeMessages = messages.filter(m => m.role !== 'system');
+      const claudeRes = await axios.post(apiUrl, {
+        model,
+        max_tokens: 2000,
+        stream: true,
+        system: messages[0].content,
+        messages: claudeMessages
+      }, {
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        responseType: 'stream',
+        timeout: 60000
+      });
+
+      claudeRes.data.on('data', (chunk) => {
+        const lines = chunk.toString().split('\n').filter(l => l.startsWith('data:'));
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line.slice(5));
+            if (json.type === 'content_block_delta') send({ type: 'delta', content: json.delta?.text || '' });
+            if (json.type === 'message_stop') { send({ type: 'done' }); res.end(); }
+          } catch {}
+        }
+      });
+      claudeRes.data.on('error', () => { send({ type: 'error', message: '流式响应出错' }); res.end(); });
+      return;
+    }
+
+    // 文心一言特殊处理（非流式）
+    if (provider === 'wenxin') {
+      const tokenRes = await axios.post(
+        `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${extraConfig?.secretKey}`,
+        {}, { timeout: 10000 }
+      );
+      const accessToken = tokenRes.data.access_token;
+      const wenxinRes = await axios.post(`${apiUrl}?access_token=${accessToken}`, {
+        messages: messages.filter(m => m.role !== 'system')
+      }, { headers: { 'Content-Type': 'application/json' }, timeout: 60000 });
+      send({ type: 'delta', content: wenxinRes.data.result || '' });
+      send({ type: 'done' });
+      res.end();
+      return;
+    }
+
+    // 通义千问特殊处理
+    if (provider === 'tongyi') {
+      const tongyiRes = await axios.post(apiUrl, {
+        model,
+        input: { messages },
+        parameters: { result_format: 'message', incremental_output: true, stream: true }
+      }, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-DashScope-SSE': 'enable' },
+        responseType: 'stream',
+        timeout: 60000
+      });
+
+      tongyiRes.data.on('data', (chunk) => {
+        const lines = chunk.toString().split('\n').filter(l => l.startsWith('data:'));
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line.slice(5));
+            const text = json.output?.choices?.[0]?.message?.content;
+            if (text) send({ type: 'delta', content: text });
+            if (json.output?.finish_reason === 'stop') { send({ type: 'done' }); res.end(); }
+          } catch {}
+        }
+      });
+      tongyiRes.data.on('error', () => { send({ type: 'error', message: '流式响应出错' }); res.end(); });
+      return;
+    }
+
+    // OpenAI 兼容格式（openai/deepseek/zhipu/moonshot/doubao/minimax/stepfun/nvidia/xai/custom）
+    const headers = { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+    const body = { model, messages, stream: true, temperature: 0.7, max_tokens: 2000 };
+
+    if (provider === 'minimax') {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      body.GroupId = extraConfig?.groupId;
+    }
+
+    const streamRes = await axios.post(apiUrl, body, {
+      headers,
+      responseType: 'stream',
+      timeout: 60000
+    });
+
+    let buffer = '';
+    streamRes.data.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // 保留不完整的行
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') { send({ type: 'done' }); res.end(); return; }
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) send({ type: 'delta', content: delta });
+        } catch {}
+      }
+    });
+    streamRes.data.on('end', () => { send({ type: 'done' }); res.end(); });
+    streamRes.data.on('error', () => { send({ type: 'error', message: '流式响应出错' }); res.end(); });
+
+  } catch (error) {
+    send({ type: 'error', message: error.response?.data?.error?.message || error.message || '请求失败' });
+    res.end();
+  }
+});
+
 module.exports = router;

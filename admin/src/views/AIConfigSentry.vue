@@ -17,6 +17,7 @@
             {{ defaultConfig?.enabled ? t('ai.enabled') : t('ai.disabled') }}
           </span>
           <button
+            v-if="activeTab === 'config'"
             @click="openCreateModal"
             class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm font-medium"
           >
@@ -24,10 +25,26 @@
           </button>
         </div>
       </div>
+      <!-- Tab 切换 -->
+      <div class="px-6 flex gap-0 border-t border-gray-100">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          @click="activeTab = tab.key"
+          :class="[
+            'px-5 py-3 text-sm font-medium border-b-2 transition-colors',
+            activeTab === tab.key
+              ? 'border-purple-600 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          ]"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
     </div>
 
-    <!-- 主内容区 -->
-    <div class="flex-1 overflow-y-auto p-6">
+    <!-- 配置管理 Tab -->
+    <div v-if="activeTab === 'config'" class="flex-1 overflow-y-auto p-6">
       <div class="max-w-6xl space-y-6">
         <!-- 当前默认配置状态 -->
         <div v-if="defaultConfig" class="border border-gray-200 rounded-lg p-6">
@@ -35,27 +52,19 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-gray-50 rounded p-4">
               <div class="text-sm text-gray-600 mb-1">{{ t('ai.configName') }}</div>
-              <div class="text-lg font-semibold text-gray-900">
-                {{ defaultConfig.name }}
-              </div>
+              <div class="text-lg font-semibold text-gray-900">{{ defaultConfig.name }}</div>
             </div>
             <div class="bg-gray-50 rounded p-4">
               <div class="text-sm text-gray-600 mb-1">{{ t('ai.provider') }}</div>
-              <div class="text-lg font-semibold text-gray-900">
-                {{ getProviderName(defaultConfig.provider) || t('ai.notConfigured') }}
-              </div>
+              <div class="text-lg font-semibold text-gray-900">{{ getProviderName(defaultConfig.provider) || t('ai.notConfigured') }}</div>
             </div>
             <div class="bg-gray-50 rounded p-4">
               <div class="text-sm text-gray-600 mb-1">{{ t('ai.currentModel') }}</div>
-              <div class="text-lg font-semibold text-gray-900">
-                {{ defaultConfig.model || t('ai.notConfigured') }}
-              </div>
+              <div class="text-lg font-semibold text-gray-900">{{ defaultConfig.model || t('ai.notConfigured') }}</div>
             </div>
             <div class="bg-gray-50 rounded p-4">
               <div class="text-sm text-gray-600 mb-1">{{ t('ai.apiKeyStatus') }}</div>
-              <div class="text-lg font-semibold text-gray-900">
-                {{ defaultConfig.apiKeyPreview ? t('ai.configured') : t('ai.notConfigured') }}
-              </div>
+              <div class="text-lg font-semibold text-gray-900">{{ defaultConfig.apiKeyPreview ? t('ai.configured') : t('ai.notConfigured') }}</div>
             </div>
           </div>
         </div>
@@ -65,7 +74,6 @@
           <div class="px-6 py-4 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900">{{ t('ai.tabs.list') }}</h3>
           </div>
-
           <div v-if="configs.length === 0" class="text-center py-12">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -73,29 +81,14 @@
             <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('ai.noConfigs') }}</h3>
             <p class="mt-1 text-sm text-gray-500">{{ t('ai.createFirstConfig') }}</p>
           </div>
-
           <div v-else class="divide-y divide-gray-200">
-            <div
-              v-for="config in configs"
-              :key="config._id"
-              class="p-6 hover:bg-gray-50 transition-colors"
-            >
+            <div v-for="config in configs" :key="config._id" class="p-6 hover:bg-gray-50 transition-colors">
               <div class="flex items-start justify-between">
                 <div class="flex-1">
                   <div class="flex items-center gap-2 mb-2">
                     <h4 class="text-lg font-semibold text-gray-900">{{ config.name }}</h4>
-                    <span
-                      v-if="config.isDefault"
-                      class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded"
-                    >
-                      {{ t('ai.isDefault') }}
-                    </span>
-                    <span
-                      :class="[
-                        'px-2 py-0.5 text-xs font-medium rounded',
-                        config.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      ]"
-                    >
+                    <span v-if="config.isDefault" class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded">{{ t('ai.isDefault') }}</span>
+                    <span :class="['px-2 py-0.5 text-xs font-medium rounded', config.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800']">
                       {{ config.enabled ? t('ai.enabled') : t('ai.disabled') }}
                     </span>
                   </div>
@@ -117,32 +110,11 @@
                 </div>
                 <div class="flex flex-col gap-2 ml-4">
                   <div class="flex gap-2">
-                    <button
-                      v-if="!config.isDefault"
-                      @click="setDefaultConfig(config._id)"
-                      class="px-3 py-1 text-xs border border-purple-600 text-purple-600 rounded hover:bg-purple-50"
-                    >
-                      {{ t('ai.setAsDefault') }}
-                    </button>
-                    <button
-                      @click="editConfig(config)"
-                      class="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                      {{ t('ai.editConfig') }}
-                    </button>
-                    <button
-                      v-if="!config.isDefault"
-                      @click="deleteConfig(config)"
-                      class="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
-                    >
-                      {{ t('ai.deleteConfig') }}
-                    </button>
+                    <button v-if="!config.isDefault" @click="setDefaultConfig(config._id)" class="px-3 py-1 text-xs border border-purple-600 text-purple-600 rounded hover:bg-purple-50">{{ t('ai.setAsDefault') }}</button>
+                    <button @click="editConfig(config)" class="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">{{ t('ai.editConfig') }}</button>
+                    <button v-if="!config.isDefault" @click="deleteConfig(config)" class="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">{{ t('ai.deleteConfig') }}</button>
                   </div>
-                  <button
-                    @click="testConfigById(config._id)"
-                    :disabled="testingConfigId === config._id"
-                    class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                  >
+                  <button @click="testConfigById(config._id)" :disabled="testingConfigId === config._id" class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
                     {{ testingConfigId === config._id ? t('ai.testing') : t('ai.testConnection') }}
                   </button>
                 </div>
@@ -185,180 +157,145 @@
       </div>
     </div>
 
+    <!-- AI 问答 Tab -->
+    <div v-if="activeTab === 'chat'" class="flex-1 flex flex-col min-h-0">
+      <!-- 模型选择栏 -->
+      <div class="px-6 py-3 border-b border-gray-200 flex items-center gap-3 bg-gray-50">
+        <span class="text-sm text-gray-600 whitespace-nowrap">使用模型：</span>
+        <select
+          v-model="chatConfigId"
+          class="px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-purple-500 bg-white"
+        >
+          <option v-for="c in configs" :key="c._id" :value="c._id">
+            {{ c.name }} · {{ c.model }}{{ c.isDefault ? ' (默认)' : '' }}
+          </option>
+        </select>
+        <button
+          @click="clearChat"
+          class="ml-auto px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-100"
+        >
+          清空对话
+        </button>
+      </div>
+
+      <!-- 消息列表 -->
+      <div ref="chatContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div v-if="chatMessages.length === 0" class="flex flex-col items-center justify-center h-full text-gray-400">
+          <svg class="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <p class="text-sm">向 AI 提问任何技术问题</p>
+        </div>
+
+        <div v-for="(msg, idx) in chatMessages" :key="idx" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+          <!-- AI 消息 -->
+          <div v-if="msg.role === 'assistant'" class="flex items-start gap-3 max-w-[80%]">
+            <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+              </svg>
+            </div>
+            <div class="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+              <span>{{ msg.content }}</span>
+              <span v-if="msg.streaming" class="inline-block w-1.5 h-4 bg-purple-500 ml-0.5 animate-pulse align-middle"></span>
+            </div>
+          </div>
+          <!-- 用户消息 -->
+          <div v-else class="max-w-[80%] bg-purple-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {{ msg.content }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 输入框 -->
+      <div class="px-6 py-4 border-t border-gray-200 bg-white">
+        <div class="flex gap-3 items-end">
+          <textarea
+            v-model="chatInput"
+            @keydown.enter.exact.prevent="sendChat"
+            @keydown.enter.shift.exact="chatInput += '\n'"
+            rows="1"
+            :disabled="chatStreaming"
+            placeholder="输入问题，Enter 发送，Shift+Enter 换行..."
+            class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl resize-none focus:outline-none focus:border-purple-500 text-sm leading-relaxed disabled:opacity-50"
+            style="max-height: 120px; overflow-y: auto;"
+          ></textarea>
+          <button
+            @click="sendChat"
+            :disabled="!chatInput.trim() || chatStreaming"
+            class="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium flex-shrink-0"
+          >
+            <svg v-if="!chatStreaming" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            {{ chatStreaming ? '生成中' : '发送' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 配置编辑弹窗 -->
-    <div
-      v-if="showModal"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      @click.self="closeModal"
-    >
+    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeModal">
       <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-900">
-            {{ editingConfig ? t('ai.editConfig') : t('ai.createConfig') }}
-          </h3>
+          <h3 class="text-lg font-semibold text-gray-900">{{ editingConfig ? t('ai.editConfig') : t('ai.createConfig') }}</h3>
           <button @click="closeModal" class="text-gray-400 hover:text-gray-600">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-
         <form @submit.prevent="saveConfig" class="p-6 space-y-4">
-          <!-- 配置名称 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.configName') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="configForm.name"
-              type="text"
-              required
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-              :placeholder="t('ai.configNamePlaceholder')"
-            />
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.configName') }} <span class="text-red-500">*</span></label>
+            <input v-model="configForm.name" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500" :placeholder="t('ai.configNamePlaceholder')" />
           </div>
-
-          <!-- 配置描述 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.configDescription') }}
-            </label>
-            <input
-              v-model="configForm.description"
-              type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-              :placeholder="t('ai.configDescriptionPlaceholder')"
-            />
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.configDescription') }}</label>
+            <input v-model="configForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500" :placeholder="t('ai.configDescriptionPlaceholder')" />
           </div>
-
-          <!-- AI 提供商选择 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.selectProvider') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <select
-              v-model="configForm.provider"
-              @change="onProviderChange"
-              required
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-            >
-              <option v-for="provider in aiProviders" :key="provider.value" :value="provider.value">
-                {{ provider.label }}
-              </option>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.selectProvider') }} <span class="text-red-500">*</span></label>
+            <select v-model="configForm.provider" @change="onProviderChange" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500">
+              <option v-for="provider in aiProviders" :key="provider.value" :value="provider.value">{{ provider.label }}</option>
             </select>
           </div>
-
-          <!-- API Key -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.apiKey') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="configForm.apiKey"
-              type="password"
-              :required="!editingConfig"
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-              :placeholder="editingConfig && configForm.hasApiKey ? t('ai.apiKeyConfigured') : t('ai.apiKeyPlaceholder')"
-            />
-            <p v-if="editingConfig && configForm.apiKeyPreview" class="mt-1 text-xs text-gray-500">
-              {{ t('ai.apiKeyPreview') }}: {{ configForm.apiKeyPreview }}
-            </p>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.apiKey') }} <span class="text-red-500">*</span></label>
+            <input v-model="configForm.apiKey" type="password" :required="!editingConfig" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500" :placeholder="editingConfig && configForm.hasApiKey ? t('ai.apiKeyConfigured') : t('ai.apiKeyPlaceholder')" />
+            <p v-if="editingConfig && configForm.apiKeyPreview" class="mt-1 text-xs text-gray-500">{{ t('ai.apiKeyPreview') }}: {{ configForm.apiKeyPreview }}</p>
           </div>
-
-          <!-- Secret Key (仅文心一言) -->
           <div v-if="configForm.provider === 'wenxin'">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.secretKey') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="configForm.secretKey"
-              type="password"
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-              :placeholder="t('ai.secretKeyPlaceholder')"
-            />
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.secretKey') }} <span class="text-red-500">*</span></label>
+            <input v-model="configForm.secretKey" type="password" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500" :placeholder="t('ai.secretKeyPlaceholder')" />
           </div>
-
-          <!-- Group ID (仅 MiniMax) -->
           <div v-if="configForm.provider === 'minimax'">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.groupId') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="configForm.groupId"
-              type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-              :placeholder="t('ai.groupIdPlaceholder')"
-            />
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.groupId') }} <span class="text-red-500">*</span></label>
+            <input v-model="configForm.groupId" type="text" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500" :placeholder="t('ai.groupIdPlaceholder')" />
           </div>
-
-          <!-- 模型选择 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.model') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <select
-              v-model="configForm.model"
-              required
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-            >
-              <option 
-                v-for="model in currentProviderConfig?.models || []" 
-                :key="model.value" 
-                :value="model.value"
-              >
-                {{ model.label }}
-              </option>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.model') }} <span class="text-red-500">*</span></label>
+            <select v-model="configForm.model" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500">
+              <option v-for="model in currentProviderConfig?.models || []" :key="model.value" :value="model.value">{{ model.label }}</option>
             </select>
-            <p v-if="currentProviderConfig?.models?.find(m => m.value === configForm.model)" class="mt-1 text-xs text-gray-500">
-              {{ getModelDescription(configForm.model) }}
-            </p>
+            <p v-if="currentProviderConfig?.models?.find(m => m.value === configForm.model)" class="mt-1 text-xs text-gray-500">{{ getModelDescription(configForm.model) }}</p>
           </div>
-
-          <!-- API URL -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              {{ t('ai.apiUrl') }}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="configForm.apiUrl"
-              type="url"
-              required
-              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500"
-              placeholder="API 端点地址"
-            />
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('ai.apiUrl') }} <span class="text-red-500">*</span></label>
+            <input v-model="configForm.apiUrl" type="url" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-purple-500" placeholder="API 端点地址" />
           </div>
-
-          <!-- 操作按钮 -->
           <div class="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              :disabled="savingConfig"
-              class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-            >
+            <button type="submit" :disabled="savingConfig" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
               {{ savingConfig ? t('ai.saving') : t('ai.saveConfig') }}
             </button>
-            <button
-              type="button"
-              @click="testConfig"
-              :disabled="testingConfig || (!configForm.apiKey && !configForm.hasApiKey && !editingConfig)"
-              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-            >
+            <button type="button" @click="testConfig" :disabled="testingConfig || (!configForm.apiKey && !configForm.hasApiKey && !editingConfig)" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
               {{ testingConfig ? t('ai.testing') : t('ai.testConnection') }}
             </button>
-            <button
-              type="button"
-              @click="closeModal"
-              class="px-4 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50"
-            >
-              {{ t('common.cancel') }}
-            </button>
+            <button type="button" @click="closeModal" class="px-4 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">{{ t('common.cancel') }}</button>
           </div>
         </form>
       </div>
@@ -366,13 +303,21 @@
   </div>
 </template>
 
+
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { showToast } from '@/utils/toast';
 
 const { t } = useI18n();
+
+// Tab
+const activeTab = ref('config');
+const tabs = [
+  { key: 'config', label: 'AI 配置' },
+  { key: 'chat', label: 'AI 问答' }
+];
 
 // 弹窗状态
 const showModal = ref(false);
@@ -407,13 +352,95 @@ const savingConfig = ref(false);
 const testingConfig = ref(false);
 const testingConfigId = ref(null);
 
+// ---- Chat ----
+const chatConfigId = ref('');
+const chatMessages = ref([]);
+const chatInput = ref('');
+const chatStreaming = ref(false);
+const chatContainer = ref(null);
+
+const scrollToBottom = async () => {
+  await nextTick();
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+  }
+};
+
+const clearChat = () => {
+  chatMessages.value = [];
+};
+
+const sendChat = async () => {
+  const text = chatInput.value.trim();
+  if (!text || chatStreaming.value) return;
+
+  chatMessages.value.push({ role: 'user', content: text });
+  chatInput.value = '';
+  await scrollToBottom();
+
+  const assistantMsg = reactive({ role: 'assistant', content: '', streaming: true });
+  chatMessages.value.push(assistantMsg);
+  chatStreaming.value = true;
+
+  // 构建历史（不含当前这条 assistant 占位）
+  const history = chatMessages.value
+    .slice(0, -1)
+    .filter(m => m.role !== 'assistant' || m.content)
+    .map(m => ({ role: m.role, content: m.content }));
+
+  try {
+    const response = await fetch('/api/ai/config/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      body: JSON.stringify({ configId: chatConfigId.value || undefined, message: text, history: history.slice(0, -1) })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || '请求失败');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const json = JSON.parse(line.slice(5));
+          if (json.type === 'delta') {
+            assistantMsg.content += json.content;
+            await scrollToBottom();
+          } else if (json.type === 'done') {
+            assistantMsg.streaming = false;
+          } else if (json.type === 'error') {
+            assistantMsg.content += `\n[错误: ${json.message}]`;
+            assistantMsg.streaming = false;
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    assistantMsg.content = `请求失败: ${err.message}`;
+  } finally {
+    assistantMsg.streaming = false;
+    chatStreaming.value = false;
+    await scrollToBottom();
+  }
+};
+
 // 获取提供商名称
 const getProviderName = (value) => {
   const provider = aiProviders.value.find(p => p.value === value);
   return provider?.label || value;
 };
 
-// 获取模型描述（国际化）
 const getModelDescription = (modelValue) => {
   const key = `ai.modelDescriptions.${modelValue}`;
   const translated = t(key);
@@ -424,7 +451,6 @@ const getModelDescription = (modelValue) => {
   return translated;
 };
 
-// 获取 AI 提供商列表
 const fetchAIProviders = async () => {
   try {
     const { data } = await axios.get('/api/ai/config/providers');
@@ -434,18 +460,21 @@ const fetchAIProviders = async () => {
   }
 };
 
-// 获取配置列表
 const fetchConfigs = async () => {
   try {
     const { data } = await axios.get('/api/ai/config');
     configs.value = data.configs || [];
+    // 默认选中默认配置
+    if (!chatConfigId.value && configs.value.length > 0) {
+      const def = configs.value.find(c => c.isDefault) || configs.value[0];
+      chatConfigId.value = def._id;
+    }
   } catch (error) {
     console.error('Failed to fetch AI configs', error);
     showToast(t('common.loadFailed'), 'error');
   }
 };
 
-// 提供商变更
 const onProviderChange = () => {
   const provider = currentProviderConfig.value;
   if (provider) {
@@ -454,20 +483,17 @@ const onProviderChange = () => {
   }
 };
 
-// 打开创建弹窗
 const openCreateModal = () => {
   resetForm();
   showModal.value = true;
 };
 
-// 关闭弹窗
 const closeModal = () => {
   showModal.value = false;
   editingConfig.value = null;
   resetForm();
 };
 
-// 保存配置
 const saveConfig = async () => {
   savingConfig.value = true;
   try {
@@ -479,36 +505,18 @@ const saveConfig = async () => {
       apiUrl: configForm.apiUrl,
       extraConfig: {}
     };
-    
-    // 只有在输入了新的 API Key 时才发送
-    if (configForm.apiKey) {
-      payload.apiKey = configForm.apiKey;
-    }
-    
-    // 文心一言需要 Secret Key
-    if (configForm.provider === 'wenxin' && configForm.secretKey) {
-      payload.extraConfig.secretKey = configForm.secretKey;
-    }
-    
-    // MiniMax 需要 Group ID
-    if (configForm.provider === 'minimax' && configForm.groupId) {
-      payload.extraConfig.groupId = configForm.groupId;
-    }
+    if (configForm.apiKey) payload.apiKey = configForm.apiKey;
+    if (configForm.provider === 'wenxin' && configForm.secretKey) payload.extraConfig.secretKey = configForm.secretKey;
+    if (configForm.provider === 'minimax' && configForm.groupId) payload.extraConfig.groupId = configForm.groupId;
     
     if (editingConfig.value) {
-      // 更新配置
       await axios.put(`/api/ai/config/${editingConfig.value._id}`, payload);
       showToast(t('ai.configUpdated'), 'success');
     } else {
-      // 创建配置
       await axios.post('/api/ai/config', payload);
       showToast(t('ai.configCreated'), 'success');
     }
-    
-    // 重新获取配置列表
     await fetchConfigs();
-    
-    // 关闭弹窗
     closeModal();
   } catch (error) {
     showToast(error.response?.data?.error || t('ai.configSaveFailed'), 'error');
@@ -517,90 +525,47 @@ const saveConfig = async () => {
   }
 };
 
-// 测试配置
 const testConfig = async () => {
   testingConfig.value = true;
   try {
     let testPayload = {};
-
-    // 编辑已有配置时：如果没有输入新 key，直接用 configId 测试已保存的配置
     if (editingConfig.value && !configForm.apiKey) {
       testPayload = { configId: editingConfig.value._id };
     } else {
-      // 新建或输入了新 key 时，用表单数据测试
-      if (!configForm.apiKey) {
-        showToast(t('ai.pleaseEnterApiKey'), 'warning');
-        return;
-      }
-      testPayload = {
-        provider: configForm.provider,
-        model: configForm.model,
-        apiUrl: configForm.apiUrl,
-        apiKey: configForm.apiKey,
-        extraConfig: {}
-      };
-
-      // 文心一言需要 Secret Key
+      if (!configForm.apiKey) { showToast(t('ai.pleaseEnterApiKey'), 'warning'); return; }
+      testPayload = { provider: configForm.provider, model: configForm.model, apiUrl: configForm.apiUrl, apiKey: configForm.apiKey, extraConfig: {} };
       if (configForm.provider === 'wenxin') {
-        if (!configForm.secretKey) {
-          showToast(t('ai.wenxinNeedsSecretKey'), 'warning');
-          return;
-        }
+        if (!configForm.secretKey) { showToast(t('ai.wenxinNeedsSecretKey'), 'warning'); return; }
         testPayload.extraConfig.secretKey = configForm.secretKey;
       }
-
-      // MiniMax 需要 Group ID
       if (configForm.provider === 'minimax') {
-        if (!configForm.groupId) {
-          showToast(t('ai.minimaxNeedsGroupId'), 'warning');
-          return;
-        }
+        if (!configForm.groupId) { showToast(t('ai.minimaxNeedsGroupId'), 'warning'); return; }
         testPayload.extraConfig.groupId = configForm.groupId;
       }
     }
-
     const { data } = await axios.post('/api/ai/config/test', testPayload);
-
-    if (data.success) {
-      showToast(data.message || t('ai.testSuccess'), 'success');
-    } else {
-      showToast(data.message || t('ai.testFailed'), 'error');
-    }
+    if (data.success) { showToast(data.message || t('ai.testSuccess'), 'success'); }
+    else { showToast(data.message || t('ai.testFailed'), 'error'); }
   } catch (error) {
-    const errorMsg = error.response?.data?.message || error.response?.data?.error || t('ai.testFailed');
-    showToast(errorMsg, 'error');
-    if (error.response?.data?.details) {
-      console.error('Test failed details:', error.response.data.details);
-    }
+    showToast(error.response?.data?.message || error.response?.data?.error || t('ai.testFailed'), 'error');
   } finally {
     testingConfig.value = false;
   }
 };
 
-// 测试配置（通过 ID）
 const testConfigById = async (configId) => {
   testingConfigId.value = configId;
   try {
     const { data } = await axios.post('/api/ai/config/test', { configId });
-    
-    if (data.success) {
-      showToast(data.message || t('ai.testSuccess'), 'success');
-    } else {
-      showToast(data.message || t('ai.testFailed'), 'error');
-    }
+    if (data.success) { showToast(data.message || t('ai.testSuccess'), 'success'); }
+    else { showToast(data.message || t('ai.testFailed'), 'error'); }
   } catch (error) {
-    const errorMsg = error.response?.data?.message || error.response?.data?.error || t('ai.testFailed');
-    showToast(errorMsg, 'error');
-    
-    if (error.response?.data?.details) {
-      console.error('Test failed details:', error.response.data.details);
-    }
+    showToast(error.response?.data?.message || error.response?.data?.error || t('ai.testFailed'), 'error');
   } finally {
     testingConfigId.value = null;
   }
 };
 
-// 编辑配置
 const editConfig = (config) => {
   editingConfig.value = config;
   configForm.name = config.name;
@@ -613,16 +578,11 @@ const editConfig = (config) => {
   configForm.groupId = config.extraConfig?.groupId || '';
   configForm.hasApiKey = !!config.apiKeyPreview;
   configForm.apiKeyPreview = config.apiKeyPreview;
-  
   showModal.value = true;
 };
 
-// 删除配置
 const deleteConfig = async (config) => {
-  if (!confirm(t('ai.confirmDeleteConfig', { name: config.name }))) {
-    return;
-  }
-  
+  if (!confirm(t('ai.confirmDeleteConfig', { name: config.name }))) return;
   try {
     await axios.delete(`/api/ai/config/${config._id}`);
     showToast(t('ai.configDeleted'), 'success');
@@ -632,19 +592,16 @@ const deleteConfig = async (config) => {
   }
 };
 
-// 设置默认配置
 const setDefaultConfig = async (configId) => {
   try {
     await axios.post(`/api/ai/config/${configId}/set-default`);
     showToast(t('ai.defaultConfigSet'), 'success');
     await fetchConfigs();
   } catch (error) {
-    const errorMsg = error.response?.data?.error || error.response?.data?.message || t('common.operationFailed');
-    showToast(errorMsg, 'error');
+    showToast(error.response?.data?.error || error.response?.data?.message || t('common.operationFailed'), 'error');
   }
 };
 
-// 重置表单
 const resetForm = () => {
   editingConfig.value = null;
   configForm.name = '';
@@ -657,8 +614,6 @@ const resetForm = () => {
   configForm.apiUrl = '';
   configForm.hasApiKey = false;
   configForm.apiKeyPreview = null;
-  
-  // 重新设置默认值
   onProviderChange();
 };
 
