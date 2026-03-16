@@ -192,7 +192,7 @@ class AIAnalysisService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -225,7 +225,7 @@ class AIAnalysisService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -256,7 +256,7 @@ class AIAnalysisService {
         headers: {
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -289,7 +289,7 @@ class AIAnalysisService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -325,7 +325,7 @@ class AIAnalysisService {
         params: {
           GroupId: this.config.extraConfig?.groupId
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -358,7 +358,7 @@ class AIAnalysisService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -383,7 +383,7 @@ class AIAnalysisService {
           'anthropic-version': '2023-06-01',
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -417,7 +417,7 @@ class AIAnalysisService {
         headers: {
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -453,7 +453,7 @@ class AIAnalysisService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -477,14 +477,16 @@ class AIAnalysisService {
             role: 'user',
             content: prompt
           }
-        ]
+        ],
+        max_tokens: 1500,
+        temperature: 0.3
       },
       {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -517,7 +519,7 @@ class AIAnalysisService {
           'Content-Type': 'application/json',
           ...this.config.extraConfig?.headers
         },
-        timeout: 30000
+        timeout: 60000
       }
     );
 
@@ -887,7 +889,7 @@ ${JSON.stringify(errorSummary, null, 2)}
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 30000
+          timeout: 60000
         }
       );
 
