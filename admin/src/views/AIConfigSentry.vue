@@ -222,8 +222,7 @@
               {{ msg.content }}
             </div>
           </div>
-
-          <!-- AI 消息 -->
+          <!-- AI 历史消息（已完成） -->
           <div v-else class="flex items-start gap-2.5">
             <div class="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
               <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,20 +230,33 @@
               </svg>
             </div>
             <div class="flex-1 min-w-0 max-w-[85%]">
-              <!-- 等待中（空内容 + streaming） -->
-              <div v-if="msg.streaming && !msg.content" class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm inline-flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 0ms"></span>
-                <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 150ms"></span>
-                <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 300ms"></span>
-              </div>
-              <!-- 有内容时 -->
-              <div v-else class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-                <div v-if="msg.streaming" class="chat-md text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">{{ msg.content }}<span class="chat-cursor"></span></div>
-                <div v-else class="chat-md text-sm text-gray-800 leading-relaxed" v-html="renderMd(msg.content)"></div>
+              <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                <div class="chat-md text-sm text-gray-800 leading-relaxed" v-html="renderMd(msg.content)"></div>
               </div>
             </div>
           </div>
         </template>
+
+        <!-- 当前流式消息（独立渲染，不在数组里） -->
+        <div v-if="chatStreaming" class="flex items-start gap-2.5">
+          <div class="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0 max-w-[85%]">
+            <!-- 等待首个 token -->
+            <div v-if="!streamingContent" class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm inline-flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay:0ms"></span>
+              <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay:150ms"></span>
+              <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay:300ms"></span>
+            </div>
+            <!-- 流式内容 -->
+            <div v-else class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+              <div class="chat-md text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">{{ streamingContent }}<span class="chat-cursor"></span></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 输入区 -->
@@ -405,7 +417,8 @@ const testingConfigId = ref(null);
 
 // ---- Chat ----
 const chatConfigId = ref('');
-const chatMessages = ref([]);
+const chatMessages = ref([]);   // 已完成的消息
+const streamingContent = ref(''); // 当前流式内容，独立 ref
 const chatInput = ref('');
 const chatStreaming = ref(false);
 const chatContainer = ref(null);
@@ -425,39 +438,40 @@ const autoResize = () => {
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 };
 
-// markdown 渲染
 const renderMd = (text) => {
   if (!text) return '';
   return marked.parse(text);
 };
 
-const scrollToBottom = async () => {
-  await nextTick();
-  if (chatContainer.value) {
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-  }
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+    }
+  });
 };
 
 const clearChat = () => {
   chatMessages.value = [];
+  streamingContent.value = '';
 };
 
 const sendChat = async () => {
   const text = chatInput.value.trim();
   if (!text || chatStreaming.value) return;
 
+  // push 用户消息
   chatMessages.value.push({ role: 'user', content: text });
   chatInput.value = '';
-  await scrollToBottom();
+  if (chatInputRef.value) chatInputRef.value.style.height = 'auto';
+  scrollToBottom();
 
-  // 直接 push 普通对象，通过索引修改确保响应式追踪
-  chatMessages.value.push({ role: 'assistant', content: '', streaming: true });
-  const msgIdx = chatMessages.value.length - 1;
+  // 开始流式
+  streamingContent.value = '';
   chatStreaming.value = true;
 
   const history = chatMessages.value
-    .slice(0, -2)
-    .filter(m => m.content)
+    .slice(0, -1)
     .map(m => ({ role: m.role, content: m.content }));
 
   try {
@@ -487,53 +501,63 @@ const sendChat = async () => {
     const decoder = new TextDecoder();
     let buf = '';
 
+    // 用宏任务逐字符渲染，实现真正的打字机效果
+    const typeQueue = [];
+    let typing = false;
+
+    const flushType = () => {
+      if (typing || typeQueue.length === 0) return;
+      typing = true;
+      const tick = () => {
+        if (typeQueue.length === 0) { typing = false; scrollToBottom(); return; }
+        // 每次取一小段（最多4个字符）渲染，速度快但有打字机感
+        const chunk = typeQueue.splice(0, 4).join('');
+        streamingContent.value += chunk;
+        setTimeout(tick, 16); // ~60fps
+      };
+      tick();
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       buf += decoder.decode(value, { stream: true });
-      let newlineIdx;
-      while ((newlineIdx = buf.indexOf('\n')) !== -1) {
-        const line = buf.slice(0, newlineIdx).trim();
-        buf = buf.slice(newlineIdx + 1);
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
         if (!line.startsWith('data:')) continue;
         const data = line.slice(5).trim();
-        if (data === '[DONE]') {
-          chatMessages.value[msgIdx].streaming = false;
-          return;
-        }
+        if (data === '[DONE]') break;
         try {
           const json = JSON.parse(data);
           if (json.type === 'delta' && json.content) {
-            // 用数组索引赋值触发 Vue 响应式
-            chatMessages.value[msgIdx] = {
-              ...chatMessages.value[msgIdx],
-              content: chatMessages.value[msgIdx].content + json.content
-            };
-            scrollToBottom();
-          } else if (json.type === 'done') {
-            chatMessages.value[msgIdx].streaming = false;
-            return;
+            // 把每个字符推入队列
+            typeQueue.push(...json.content.split(''));
+            flushType();
           } else if (json.type === 'error') {
-            chatMessages.value[msgIdx] = {
-              ...chatMessages.value[msgIdx],
-              content: chatMessages.value[msgIdx].content + `\n\n> ⚠️ ${json.message}`,
-              streaming: false
-            };
-            return;
+            typeQueue.push(...(`\n\n> ⚠️ ${json.message}`).split(''));
+            flushType();
           }
         } catch {}
       }
     }
+
+    // 等待打字队列清空
+    await new Promise(resolve => {
+      const wait = () => typeQueue.length === 0 && !typing ? resolve() : setTimeout(wait, 50);
+      wait();
+    });
   } catch (err) {
-    chatMessages.value[msgIdx] = {
-      ...chatMessages.value[msgIdx],
-      content: `> ⚠️ 请求失败: ${err.message}`,
-      streaming: false
-    };
+    streamingContent.value = streamingContent.value || `> ⚠️ 请求失败: ${err.message}`;
   } finally {
-    chatMessages.value[msgIdx].streaming = false;
+    // 流结束，固化进历史
+    if (streamingContent.value) {
+      chatMessages.value.push({ role: 'assistant', content: streamingContent.value });
+    }
+    streamingContent.value = '';
     chatStreaming.value = false;
-    await scrollToBottom();
+    scrollToBottom();
   }
 };
 

@@ -700,7 +700,7 @@ router.post('/chat', authenticate, authorize('admin'), async (req, res) => {
       }));
       const geminiRes = await axios.post(url, {
         contents: geminiMessages,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
       }, { responseType: 'stream', timeout: 60000 });
 
       geminiRes.data.on('data', (chunk) => {
@@ -723,7 +723,7 @@ router.post('/chat', authenticate, authorize('admin'), async (req, res) => {
       const claudeMessages = messages.filter(m => m.role !== 'system');
       const claudeRes = await axios.post(apiUrl, {
         model,
-        max_tokens: 2000,
+        max_tokens: 4096,
         stream: true,
         system: messages[0].content,
         messages: claudeMessages
@@ -792,7 +792,7 @@ router.post('/chat', authenticate, authorize('admin'), async (req, res) => {
 
     // OpenAI 兼容格式（openai/deepseek/zhipu/moonshot/doubao/minimax/stepfun/nvidia/xai/custom）
     const headers = { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
-    const body = { model, messages, stream: true, temperature: 0.7, max_tokens: 2000 };
+    const body = { model, messages, stream: true, temperature: 0.7, max_tokens: 4096 };
 
     if (provider === 'minimax') {
       headers['Authorization'] = `Bearer ${apiKey}`;

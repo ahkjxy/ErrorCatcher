@@ -25,6 +25,7 @@
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.10",
     "echarts": "^5.4.3",
+    "marked": "^15.0.12",
     "pinia": "^2.1.7",
     "socket.io-client": "^4.8.3",
     "vue": "^3.3.4",
