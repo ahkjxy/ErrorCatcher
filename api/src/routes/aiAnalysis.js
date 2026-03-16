@@ -282,8 +282,9 @@ function cleanAnalysisField(obj) {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```\s*$/, '')
     .trim();
-  // 如果 analysis 字段本身是 JSON，说明整个结果没被正确解析，重新提取
+  // 如果 analysis 字段本身是 JSON（或截断的 JSON），说明整个结果没被正确解析
   if (stripped.startsWith('{')) {
+    // 先尝试完整解析
     try {
       const parsed = JSON.parse(stripped);
       return {
@@ -296,7 +297,27 @@ function cleanAnalysisField(obj) {
         suggestedFixes: parsed.suggestedFixes?.length ? parsed.suggestedFixes : obj.suggestedFixes,
         preventionTips: parsed.preventionTips?.length ? parsed.preventionTips : obj.preventionTips
       };
-    } catch (e) { /* 解析失败保持原样 */ }
+    } catch (e) {
+      // JSON 截断/损坏，用正则尽量提取各字段
+      const extract = (key) => {
+        const m = stripped.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*?)"`));
+        return m ? m[1] : null;
+      };
+      const extractNum = (key) => {
+        const m = stripped.match(new RegExp(`"${key}"\\s*:\\s*([0-9.]+)`));
+        return m ? parseFloat(m[1]) : null;
+      };
+      return {
+        ...obj,
+        rootCause: extract('rootCause') || obj.rootCause,
+        category: extract('category') || obj.category,
+        confidence: extractNum('confidence') ?? obj.confidence,
+        analysis: extract('analysis') || '（AI 返回数据不完整，请重新分析）',
+        possibleReasons: obj.possibleReasons,
+        suggestedFixes: obj.suggestedFixes,
+        preventionTips: obj.preventionTips
+      };
+    }
   }
   return obj;
 }
