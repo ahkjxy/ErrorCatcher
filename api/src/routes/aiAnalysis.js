@@ -26,7 +26,7 @@ router.post('/errors/:errorId/analyze', authenticate, async (req, res) => {
     
     if (analysis && !req.body.force) {
       return res.json({ 
-        analysis,
+        analysis: cleanAnalysisField(analysis.toObject ? analysis.toObject() : analysis),
         cached: true,
         message: '返回缓存的分析结果'
       });
@@ -79,7 +79,7 @@ router.post('/errors/:errorId/analyze', authenticate, async (req, res) => {
     }));
 
     res.json({
-      analysis: analysisObj,
+      analysis: cleanAnalysisField(analysisObj),
       cached: false,
       message: 'AI 分析完成'
     });
@@ -126,7 +126,7 @@ router.get('/errors/:errorId/analysis', authenticate, async (req, res) => {
       analysis.relatedErrors = relatedErrorsDetails;
     }
 
-    res.json({ analysis });
+    res.json({ analysis: cleanAnalysisField(analysis) });
 
   } catch (error) {
     console.error('Get analysis failed:', error);
@@ -273,6 +273,33 @@ router.get('/projects/:projectId/analysis-stats', authenticate, async (req, res)
     res.status(500).json({ error: '获取统计失败' });
   }
 });
+
+// 辅助函数：清理 AI 返回的 markdown 包裹，确保 analysis 字段是纯文本
+function cleanAnalysisField(obj) {
+  if (!obj || typeof obj.analysis !== 'string') return obj;
+  const raw = obj.analysis;
+  const stripped = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  // 如果 analysis 字段本身是 JSON，说明整个结果没被正确解析，重新提取
+  if (stripped.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(stripped);
+      return {
+        ...obj,
+        rootCause: parsed.rootCause || obj.rootCause,
+        category: parsed.category || obj.category,
+        confidence: parsed.confidence ?? obj.confidence,
+        analysis: parsed.analysis || stripped,
+        possibleReasons: parsed.possibleReasons?.length ? parsed.possibleReasons : obj.possibleReasons,
+        suggestedFixes: parsed.suggestedFixes?.length ? parsed.suggestedFixes : obj.suggestedFixes,
+        preventionTips: parsed.preventionTips?.length ? parsed.preventionTips : obj.preventionTips
+      };
+    } catch (e) { /* 解析失败保持原样 */ }
+  }
+  return obj;
+}
 
 // 辅助函数：查找相似错误
 async function findRelatedErrors(error, limit = 5) {
