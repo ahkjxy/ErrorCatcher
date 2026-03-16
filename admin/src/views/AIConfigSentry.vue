@@ -158,86 +158,130 @@
     </div>
 
     <!-- AI 问答 Tab -->
-    <div v-if="activeTab === 'chat'" class="flex-1 flex flex-col min-h-0">
-      <!-- 模型选择栏 -->
-      <div class="px-6 py-3 border-b border-gray-200 flex items-center gap-3 bg-gray-50">
-        <span class="text-sm text-gray-600 whitespace-nowrap">使用模型：</span>
+    <div v-if="activeTab === 'chat'" class="flex-1 flex flex-col min-h-0 bg-gray-50">
+      <!-- 顶栏 -->
+      <div class="px-5 py-2.5 border-b border-gray-200 flex items-center gap-3 bg-white">
+        <div class="flex items-center gap-2 text-sm text-gray-500">
+          <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+          </svg>
+          <span class="text-gray-400">模型</span>
+        </div>
         <select
           v-model="chatConfigId"
-          class="px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-purple-500 bg-white"
+          class="px-2.5 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-purple-400 bg-white text-gray-700 font-medium"
         >
           <option v-for="c in configs" :key="c._id" :value="c._id">
-            {{ c.name }} · {{ c.model }}{{ c.isDefault ? ' (默认)' : '' }}
+            {{ c.name }} · {{ c.model }}{{ c.isDefault ? ' ✦' : '' }}
           </option>
         </select>
         <button
+          v-if="chatMessages.length > 0"
           @click="clearChat"
-          class="ml-auto px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-100"
+          class="ml-auto flex items-center gap-1.5 px-3 py-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
         >
-          清空对话
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          清空
         </button>
       </div>
 
       <!-- 消息列表 -->
-      <div ref="chatContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-        <div v-if="chatMessages.length === 0" class="flex flex-col items-center justify-center h-full text-gray-400">
-          <svg class="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          <p class="text-sm">向 AI 提问任何技术问题</p>
+      <div ref="chatContainer" class="flex-1 overflow-y-auto px-4 py-5 space-y-4">
+
+        <!-- 空状态 -->
+        <div v-if="chatMessages.length === 0" class="flex flex-col items-center justify-center h-full gap-3 select-none">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+            </svg>
+          </div>
+          <div class="text-center">
+            <p class="text-gray-700 font-medium text-sm">AI 助手</p>
+            <p class="text-gray-400 text-xs mt-1">可以问我代码、错误分析、技术方案等问题</p>
+          </div>
+          <!-- 快捷提问 -->
+          <div class="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
+            <button
+              v-for="q in quickQuestions"
+              :key="q"
+              @click="chatInput = q; sendChat()"
+              class="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-full text-gray-600 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-colors shadow-sm"
+            >
+              {{ q }}
+            </button>
+          </div>
         </div>
 
-        <div v-for="(msg, idx) in chatMessages" :key="idx" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+        <!-- 消息 -->
+        <template v-for="(msg, idx) in chatMessages" :key="idx">
+          <!-- 用户消息 -->
+          <div v-if="msg.role === 'user'" class="flex justify-end">
+            <div class="max-w-[75%] bg-purple-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm">
+              {{ msg.content }}
+            </div>
+          </div>
+
           <!-- AI 消息 -->
-          <div v-if="msg.role === 'assistant'" class="flex items-start gap-3 max-w-[85%]">
-            <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-1">
-              <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div v-else class="flex items-start gap-2.5">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+              <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
               </svg>
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-                <!-- streaming 时显示纯文本避免 marked 频繁解析 -->
-                <div v-if="msg.streaming" class="chat-md text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">{{ msg.content }}<span class="inline-block w-0.5 h-4 bg-purple-500 ml-0.5 animate-[blink_0.8s_step-end_infinite] align-middle"></span></div>
+            <div class="flex-1 min-w-0 max-w-[85%]">
+              <!-- 等待中（空内容 + streaming） -->
+              <div v-if="msg.streaming && !msg.content" class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm inline-flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 0ms"></span>
+                <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 150ms"></span>
+                <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 300ms"></span>
+              </div>
+              <!-- 有内容时 -->
+              <div v-else class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                <div v-if="msg.streaming" class="chat-md text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">{{ msg.content }}<span class="chat-cursor"></span></div>
                 <div v-else class="chat-md text-sm text-gray-800 leading-relaxed" v-html="renderMd(msg.content)"></div>
               </div>
             </div>
           </div>
-          <!-- 用户消息 -->
-          <div v-else class="max-w-[75%] bg-purple-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm">
-            {{ msg.content }}
-          </div>
-        </div>
+        </template>
       </div>
 
-      <!-- 输入框 -->
-      <div class="px-6 py-4 border-t border-gray-200 bg-white">
-        <div class="flex gap-3 items-end">
+      <!-- 输入区 -->
+      <div class="px-4 pb-4 pt-2 bg-white border-t border-gray-100">
+        <div class="flex gap-2 items-end bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-purple-400 focus-within:bg-white transition-colors">
           <textarea
             v-model="chatInput"
+            ref="chatInputRef"
             @keydown.enter.exact.prevent="sendChat"
             @keydown.enter.shift.exact="chatInput += '\n'"
+            @input="autoResize"
             rows="1"
             :disabled="chatStreaming"
-            placeholder="输入问题，Enter 发送，Shift+Enter 换行..."
-            class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl resize-none focus:outline-none focus:border-purple-500 text-sm leading-relaxed disabled:opacity-50"
+            placeholder="有什么想问的？"
+            class="flex-1 bg-transparent resize-none focus:outline-none text-sm text-gray-800 placeholder-gray-400 leading-relaxed disabled:opacity-50 py-1"
             style="max-height: 120px; overflow-y: auto;"
           ></textarea>
           <button
             @click="sendChat"
             :disabled="!chatInput.trim() || chatStreaming"
-            class="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium flex-shrink-0"
+            :class="[
+              'w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all mb-0.5',
+              chatInput.trim() && !chatStreaming
+                ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            ]"
           >
-            <svg v-if="!chatStreaming" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            <svg v-if="!chatStreaming" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
             </svg>
-            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg v-else class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            {{ chatStreaming ? '生成中' : '发送' }}
           </button>
         </div>
+        <p class="text-center text-xs text-gray-300 mt-1.5">Enter 发送 · Shift+Enter 换行</p>
       </div>
     </div>
 
@@ -365,6 +409,21 @@ const chatMessages = ref([]);
 const chatInput = ref('');
 const chatStreaming = ref(false);
 const chatContainer = ref(null);
+const chatInputRef = ref(null);
+
+const quickQuestions = [
+  '如何排查 Network Error？',
+  '解释一下 CORS 跨域问题',
+  '常见的 JS 内存泄漏原因',
+  'Vue 响应式原理是什么？',
+];
+
+const autoResize = () => {
+  const el = chatInputRef.value;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+};
 
 // markdown 渲染
 const renderMd = (text) => {
@@ -739,4 +798,19 @@ onMounted(() => {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+.chat-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #7c3aed;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+
+/* bounce 延迟 */
+.animate-bounce:nth-child(1) { animation-delay: 0ms; }
+.animate-bounce:nth-child(2) { animation-delay: 150ms; }
+.animate-bounce:nth-child(3) { animation-delay: 300ms; }
 </style>
