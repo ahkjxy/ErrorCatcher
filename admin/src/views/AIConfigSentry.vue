@@ -391,8 +391,9 @@ const sendChat = async () => {
   chatInput.value = '';
   await scrollToBottom();
 
-  const assistantMsg = reactive({ role: 'assistant', content: '', streaming: true });
-  chatMessages.value.push(assistantMsg);
+  // 直接 push 普通对象，通过索引修改确保响应式追踪
+  chatMessages.value.push({ role: 'assistant', content: '', streaming: true });
+  const msgIdx = chatMessages.value.length - 1;
   chatStreaming.value = true;
 
   const history = chatMessages.value
@@ -427,42 +428,51 @@ const sendChat = async () => {
     const decoder = new TextDecoder();
     let buf = '';
 
-    const pump = async () => {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        // 按行处理，保留不完整的行
-        let newlineIdx;
-        while ((newlineIdx = buf.indexOf('\n')) !== -1) {
-          const line = buf.slice(0, newlineIdx).trim();
-          buf = buf.slice(newlineIdx + 1);
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (data === '[DONE]') { assistantMsg.streaming = false; return; }
-          try {
-            const json = JSON.parse(data);
-            if (json.type === 'delta' && json.content) {
-              assistantMsg.content += json.content;
-              scrollToBottom();
-            } else if (json.type === 'done') {
-              assistantMsg.streaming = false;
-              return;
-            } else if (json.type === 'error') {
-              assistantMsg.content += `\n\n> ⚠️ ${json.message}`;
-              assistantMsg.streaming = false;
-              return;
-            }
-          } catch {}
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let newlineIdx;
+      while ((newlineIdx = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, newlineIdx).trim();
+        buf = buf.slice(newlineIdx + 1);
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') {
+          chatMessages.value[msgIdx].streaming = false;
+          return;
         }
+        try {
+          const json = JSON.parse(data);
+          if (json.type === 'delta' && json.content) {
+            // 用数组索引赋值触发 Vue 响应式
+            chatMessages.value[msgIdx] = {
+              ...chatMessages.value[msgIdx],
+              content: chatMessages.value[msgIdx].content + json.content
+            };
+            scrollToBottom();
+          } else if (json.type === 'done') {
+            chatMessages.value[msgIdx].streaming = false;
+            return;
+          } else if (json.type === 'error') {
+            chatMessages.value[msgIdx] = {
+              ...chatMessages.value[msgIdx],
+              content: chatMessages.value[msgIdx].content + `\n\n> ⚠️ ${json.message}`,
+              streaming: false
+            };
+            return;
+          }
+        } catch {}
       }
-    };
-
-    await pump();
+    }
   } catch (err) {
-    assistantMsg.content = `> ⚠️ 请求失败: ${err.message}`;
+    chatMessages.value[msgIdx] = {
+      ...chatMessages.value[msgIdx],
+      content: `> ⚠️ 请求失败: ${err.message}`,
+      streaming: false
+    };
   } finally {
-    assistantMsg.streaming = false;
+    chatMessages.value[msgIdx].streaming = false;
     chatStreaming.value = false;
     await scrollToBottom();
   }
