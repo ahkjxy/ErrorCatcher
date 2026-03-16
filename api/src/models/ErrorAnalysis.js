@@ -52,6 +52,10 @@ const errorAnalysisSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Error'
   }],
+  // AI 原始返回数据
+  rawAIData: {
+    type: String
+  },
   // AI 模型信息
   model: {
     type: String,

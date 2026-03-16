@@ -140,11 +140,10 @@ class AIAnalysisService {
           throw new Error(`Unsupported provider: ${this.provider}`);
       }
 
-      return this._parseAnalysis(response, errorData);
-      
+      const result = this._parseAnalysis(response, errorData);
+      return result;
     } catch (error) {
       console.error('AI analysis failed:', error.message);
-      // 返回详细的错误信息，包括模型的报错输出
       return {
         success: false,
         rootCause: 'AI 分析失败',
@@ -691,7 +690,8 @@ class AIAnalysisService {
           suggestedFixes: parsed.suggestedFixes || [],
           preventionTips: parsed.preventionTips || [],
           analyzedAt: new Date(),
-          model: this.model
+          model: this.model,
+          rawAIData: analysisText
         };
       }
       
@@ -706,7 +706,8 @@ class AIAnalysisService {
         suggestedFixes: [],
         preventionTips: [],
         analyzedAt: new Date(),
-        model: this.model
+        model: this.model,
+        rawAIData: analysisText
       };
       
     } catch (error) {
