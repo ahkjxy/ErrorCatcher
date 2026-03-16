@@ -671,8 +671,14 @@ class AIAnalysisService {
    */
   _parseAnalysis(analysisText, errorData) {
     try {
-      // 尝试提取 JSON
-      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+      // 先去掉 markdown 代码块包裹（```json ... ``` 或 ``` ... ```）
+      const stripped = analysisText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/, '')
+        .trim();
+
+      // 尝试提取 JSON 对象
+      const jsonMatch = stripped.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return {
