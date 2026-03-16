@@ -251,9 +251,9 @@
               <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay:150ms"></span>
               <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style="animation-delay:300ms"></span>
             </div>
-            <!-- 流式内容 -->
+            <!-- 流式内容（实时 markdown 渲染） -->
             <div v-else class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-              <div class="chat-md text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">{{ streamingContent }}<span class="chat-cursor"></span></div>
+              <div class="chat-md text-sm text-gray-800 leading-relaxed" v-html="renderMdStream(streamingContent)"></div>
             </div>
           </div>
         </div>
@@ -441,6 +441,15 @@ const autoResize = () => {
 const renderMd = (text) => {
   if (!text) return '';
   return marked.parse(text);
+};
+
+// 流式渲染：在末尾插入光标后再解析 markdown
+const renderMdStream = (text) => {
+  if (!text) return '';
+  // 在末尾加一个不可见占位，避免末尾未闭合 markdown 语法影响光标位置
+  const html = marked.parse(text);
+  // 把光标插入最后一个块级元素内部末尾
+  return html.replace(/(<\/(?:p|li|h[1-6]|td)>)(?![\s\S]*<\/(?:p|li|h[1-6]|td)>)/, '<span class="chat-cursor"></span>$1');
 };
 
 const scrollToBottom = () => {
