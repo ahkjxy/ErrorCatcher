@@ -188,15 +188,42 @@
             <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
             </svg>
-            <span class="flex-1 truncate">{{ s.title }}</span>
-            <button
-              @click.stop="deleteSession(s._id)"
-              class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-500 transition-all"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+            <!-- 双击进入重命名 -->
+            <input
+              v-if="renamingId === s._id"
+              :ref="el => { if (el) el.focus() }"
+              v-model="renamingTitle"
+              @keydown.enter.prevent="confirmRename(s._id)"
+              @keydown.esc="renamingId = null"
+              @blur="confirmRename(s._id)"
+              @click.stop
+              class="flex-1 min-w-0 bg-white border border-purple-400 rounded px-1 py-0.5 text-xs outline-none"
+            />
+            <span
+              v-else
+              class="flex-1 truncate"
+              @dblclick.stop="startRename(s)"
+            >{{ s.title }}</span>
+            <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+              <button
+                @click.stop="startRename(s)"
+                class="p-0.5 rounded hover:text-purple-600"
+                title="重命名"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+              <button
+                @click.stop="deleteSession(s._id)"
+                class="p-0.5 rounded hover:text-red-500"
+                title="删除"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
           <div v-if="sessions.length === 0" class="px-3 py-6 text-center text-xs text-gray-400">
             暂无对话记录
@@ -492,6 +519,29 @@ const deleteSession = async (id) => {
     if (currentSessionId.value === id) newSession();
   } catch {
     showToast('删除失败', 'error');
+  }
+};
+
+// 重命名
+const renamingId = ref(null);
+const renamingTitle = ref('');
+
+const startRename = (s) => {
+  renamingId.value = s._id;
+  renamingTitle.value = s.title;
+};
+
+const confirmRename = async (id) => {
+  const title = renamingTitle.value.trim();
+  renamingId.value = null;
+  if (!title) return;
+  const s = sessions.value.find(s => s._id === id);
+  if (s && s.title === title) return;
+  try {
+    await axios.patch(`/api/chat-sessions/${id}`, { title });
+    if (s) s.title = title;
+  } catch {
+    showToast('重命名失败', 'error');
   }
 };
 
