@@ -39,7 +39,19 @@ class ErrorCatcher {
       ],
       beforeSend: config.beforeSend || null,
       onError: config.onError || null,
-      fetch: config.fetch || null  // SSR 环境的 fetch 实现
+      fetch: config.fetch || null,  // SSR 环境的 fetch 实现
+      
+      // 新增配置
+      enablePerformanceMonitoring: config.enablePerformanceMonitoring !== false,
+      enableOfflineStorage: config.enableOfflineStorage !== false,
+      enableDeduplication: config.enableDeduplication !== false,
+      deduplicationTimeout: config.deduplicationTimeout || 5000,
+      sensitiveKeys: config.sensitiveKeys || [
+        'password', 'token', 'secret', 'authorization', 
+        'cookie', 'passwd', 'api_key', 'apikey', 'credit_card'
+      ],
+      maxResponseSize: config.maxResponseSize || 1024 * 1024, // 1MB
+      maxBreadcrumbs: config.maxBreadcrumbs || 100
     };
 
     // 环境检测
@@ -51,6 +63,9 @@ class ErrorCatcher {
     this.errorQueue = [];
     this.isSending = false;
     this.retryCount = 0;
+    this.batchSenderInterval = null;
+    this.lastErrors = new Map(); // 用于错误去重
+    this.offlineStorage = null;
     
     // 框架检测结果
     this.detectedFrameworks = {
@@ -61,6 +76,10 @@ class ErrorCatcher {
       nextjs: false,
       axios: null
     };
+    
+    // 绑定事件处理器
+    this.globalErrorHandler = this.handleGlobalError.bind(this);
+    this.promiseRejectionHandler = this.handlePromiseRejection.bind(this);
     
     // 原始方法保存
     if (this.isBrowser) {
@@ -87,7 +106,7 @@ class ErrorCatcher {
   /**
    * 初始化
    */
-  init() {
+  async init() {
     if (this.initialized) {
       console.warn('[ErrorCatcher] Already initialized');
       return;
@@ -114,9 +133,20 @@ class ErrorCatcher {
         this.interceptFetch();
         this.interceptXHR();
         this.startBatchSender();
+        
+        // 3. 启动性能监控
+        if (this.config.enablePerformanceMonitoring) {
+          this.startPerformanceMonitoring();
+        }
+        
+        // 4. 初始化离线存储
+        if (this.config.enableOfflineStorage) {
+          await this.initOfflineStorage();
+          await this.sendPendingErrors();
+        }
       }
 
-      // 3. 集成框架
+      // 5. 集成框架
       this.integrateFrameworks();
 
       this.initialized = true;
@@ -143,13 +173,14 @@ class ErrorCatcher {
         this.config.vue = window.Vue;
       } else if (window.__VUE__) {
         this.detectedFrameworks.vue = 'vue3';
+        this.config.vue = window.__VUE__;
       }
     } else {
       this.detectedFrameworks.vue = this.config.vue;
     }
 
     // 检测 React
-    if (!this.config.react && window.React) {
+    if (!this.config.react && (window.React || window.__REACT_DEVTOOLS_GLOBAL_HOOK__)) {
       this.detectedFrameworks.react = true;
       this.config.react = true;
     }
@@ -186,38 +217,80 @@ class ErrorCatcher {
    */
   installGlobalHandlers() {
     // 全局错误
-    window.addEventListener('error', (event) => {
-      // 忽略资源加载错误
-      if (event.target && event.target.tagName) {
-        return;
-      }
-
-      this.captureError({
-        type: 'global_error',
-        message: event.message,
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-        stack: event.error?.stack,
-        timestamp: new Date().toISOString(),
-        pageUrl: window.location.href
-      });
-    });
-
+    window.addEventListener('error', this.globalErrorHandler);
     // Promise rejection
-    window.addEventListener('unhandledrejection', (event) => {
-      this.captureError({
-        type: 'promise_rejection',
-        message: event.reason?.message || String(event.reason),
-        stack: event.reason?.stack,
-        timestamp: new Date().toISOString(),
-        pageUrl: window.location.href
-      });
-    });
+    window.addEventListener('unhandledrejection', this.promiseRejectionHandler);
 
     if (this.config.debug) {
       console.log('[ErrorCatcher] ✅ Global handlers installed');
     }
+  }
+
+  /**
+   * 处理全局错误
+   */
+  handleGlobalError(event) {
+    // 区分脚本错误和资源加载错误
+    if (event.target && (event.target.tagName === 'LINK' || 
+        event.target.tagName === 'SCRIPT' || 
+        event.target.tagName === 'IMG')) {
+      // 资源加载错误，上报但标记为资源错误
+      this.captureError({
+        type: 'resource_error',
+        message: `Failed to load ${event.target.tagName}: ${event.target.src || event.target.href}`,
+        tagName: event.target.tagName,
+        src: event.target.src || event.target.href,
+        timestamp: new Date().toISOString(),
+        pageUrl: window.location.href
+      });
+      return;
+    }
+
+    // 脚本错误
+    this.captureError({
+      type: 'global_error',
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      stack: event.error?.stack,
+      timestamp: new Date().toISOString(),
+      pageUrl: window.location.href
+    });
+  }
+
+  /**
+   * 处理 Promise rejection
+   */
+  handlePromiseRejection(event) {
+    let message, stack, reason;
+    
+    if (event.reason instanceof Error) {
+      message = event.reason.message;
+      stack = event.reason.stack;
+      reason = event.reason;
+    } else if (typeof event.reason === 'string') {
+      message = event.reason;
+      stack = new Error(message).stack;
+      reason = event.reason;
+    } else {
+      try {
+        message = JSON.stringify(event.reason);
+      } catch (e) {
+        message = 'Unhandled Promise Rejection';
+      }
+      stack = null;
+      reason = event.reason;
+    }
+
+    this.captureError({
+      type: 'promise_rejection',
+      message: message,
+      stack: stack,
+      reason: reason,
+      timestamp: new Date().toISOString(),
+      pageUrl: window.location.href
+    });
   }
 
   /**
@@ -229,9 +302,18 @@ class ErrorCatcher {
 
     window.fetch = function(...args) {
       const [resource, init = {}] = args;
-      const url = typeof resource === 'string' ? resource : resource.url;
+      let url = typeof resource === 'string' ? resource : resource.url;
       const method = init.method || 'GET';
       const startTime = Date.now();
+
+      // 处理相对路径
+      if (url && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('//')) {
+        try {
+          url = new URL(url, window.location.href).href;
+        } catch (e) {
+          // URL 解析失败，使用原值
+        }
+      }
 
       if (self.shouldIgnore(url)) {
         return originalFetch.apply(this, args);
@@ -249,6 +331,11 @@ class ErrorCatcher {
             try {
               responseText = await clonedResponse.text();
               responseSize = new Blob([responseText]).size;
+              
+              // 限制响应体大小
+              if (responseSize > self.config.maxResponseSize) {
+                responseText = self.truncate(responseText, 5000);
+              }
             } catch (e) {
               responseText = 'Unable to read response';
             }
@@ -259,14 +346,18 @@ class ErrorCatcher {
               responseHeaders[key] = value;
             });
 
+            // 敏感信息过滤
+            const sanitizedHeaders = self.sanitizeData(init.headers);
+            const sanitizedBody = self.sanitizeData(init.body);
+
             self.captureError({
               type: 'fetch_error',
               url: url,
               method: method.toUpperCase(),
               status: response.status,
               statusText: response.statusText,
-              requestHeaders: init.headers,
-              requestBody: init.body,
+              requestHeaders: sanitizedHeaders,
+              requestBody: sanitizedBody,
               response: self.truncate(responseText, 2000),
               responseHeaders: responseHeaders,
               responseSize: responseSize,
@@ -276,7 +367,7 @@ class ErrorCatcher {
                 endTime: Date.now(),
                 duration: duration
               },
-              curlCommand: self.generateCurlCommand(url, method.toUpperCase(), init.headers, init.body),
+              curlCommand: self.generateCurlCommand(url, method.toUpperCase(), sanitizedHeaders, sanitizedBody),
               timestamp: new Date().toISOString(),
               pageUrl: window.location.href
             });
@@ -293,15 +384,15 @@ class ErrorCatcher {
             method: method.toUpperCase(),
             message: error.message,
             stack: error.stack,
-            requestHeaders: init.headers,
-            requestBody: init.body,
+            requestHeaders: self.sanitizeData(init.headers),
+            requestBody: self.sanitizeData(init.body),
             duration: duration,
             timing: {
               startTime: startTime,
               endTime: Date.now(),
               duration: duration
             },
-            curlCommand: self.generateCurlCommand(url, method.toUpperCase(), init.headers, init.body),
+            curlCommand: self.generateCurlCommand(url, method.toUpperCase(), self.sanitizeData(init.headers), self.sanitizeData(init.body)),
             timestamp: new Date().toISOString(),
             pageUrl: window.location.href
           });
@@ -323,10 +414,20 @@ class ErrorCatcher {
     const requestMap = new WeakMap();
 
     XMLHttpRequest.prototype.open = function(method, url, ...args) {
-      if (!self.shouldIgnore(url)) {
+      let fullUrl = url;
+      // 处理相对路径
+      if (fullUrl && !fullUrl.startsWith('http://') && !fullUrl.startsWith('https://') && !fullUrl.startsWith('//')) {
+        try {
+          fullUrl = new URL(fullUrl, window.location.href).href;
+        } catch (e) {
+          // URL 解析失败，使用原值
+        }
+      }
+      
+      if (!self.shouldIgnore(fullUrl)) {
         requestMap.set(this, {
           method: method.toUpperCase(),
-          url: url,
+          url: fullUrl,
           startTime: Date.now(),
           headers: {}
         });
@@ -364,7 +465,13 @@ class ErrorCatcher {
               }
             });
 
-            const responseSize = new Blob([this.responseText]).size;
+            let responseText = this.responseText;
+            let responseSize = responseText ? new Blob([responseText]).size : 0;
+            
+            // 限制响应体大小
+            if (responseSize > self.config.maxResponseSize) {
+              responseText = self.truncate(responseText, 5000);
+            }
 
             self.captureError({
               type: 'xhr_error',
@@ -372,9 +479,9 @@ class ErrorCatcher {
               method: info.method,
               status: this.status,
               statusText: this.statusText,
-              requestHeaders: info.headers,
-              requestBody: info.body,
-              response: self.truncate(this.responseText, 2000),
+              requestHeaders: self.sanitizeData(info.headers),
+              requestBody: self.sanitizeData(info.body),
+              response: self.truncate(responseText, 2000),
               responseHeaders: responseHeaders,
               responseSize: responseSize,
               duration: duration,
@@ -383,7 +490,7 @@ class ErrorCatcher {
                 endTime: Date.now(),
                 duration: duration
               },
-              curlCommand: self.generateCurlCommand(info.url, info.method, info.headers, info.body),
+              curlCommand: self.generateCurlCommand(info.url, info.method, self.sanitizeData(info.headers), self.sanitizeData(info.body)),
               timestamp: new Date().toISOString(),
               pageUrl: window.location.href
             });
@@ -398,15 +505,15 @@ class ErrorCatcher {
             url: info.url,
             method: info.method,
             message: 'Network Error',
-            requestHeaders: info.headers,
-            requestBody: info.body,
+            requestHeaders: self.sanitizeData(info.headers),
+            requestBody: self.sanitizeData(info.body),
             duration: duration,
             timing: {
               startTime: info.startTime,
               endTime: Date.now(),
               duration: duration
             },
-            curlCommand: self.generateCurlCommand(info.url, info.method, info.headers, info.body),
+            curlCommand: self.generateCurlCommand(info.url, info.method, self.sanitizeData(info.headers), self.sanitizeData(info.body)),
             timestamp: new Date().toISOString(),
             pageUrl: window.location.href
           });
@@ -447,26 +554,79 @@ class ErrorCatcher {
   }
 
   /**
-   * 集成 Vue
+   * 集成 Vue (支持 Vue 2 和 Vue 3)
    */
   integrateVue() {
     const vue = this.config.vue;
     if (!vue) return;
 
     const self = this;
+    
+    // 检测 Vue 版本
+    const isVue3 = vue.version && vue.version.startsWith('3');
+    const isVue2 = vue.version && vue.version.startsWith('2');
 
-    // Vue 2/3 通用
-    if (vue.config) {
+    if (isVue3 && vue.config) {
+      // Vue 3 错误处理
+      const originalErrorHandler = vue.config.errorHandler;
+      
+      vue.config.errorHandler = (err, instance, info) => {
+        let vueContext = {};
+        
+        try {
+          vueContext = {
+            componentName: instance?.type?.name || instance?.$.type?.name || 'Anonymous',
+            lifecycle: info,
+            componentPath: instance?.type?.__file,
+            props: self.sanitizeData(instance?.props),
+            data: self.sanitizeData(instance?.data),
+            setupState: instance?.setupState ? Object.keys(instance.setupState) : [],
+            attrs: instance?.attrs,
+            slots: instance?.slots ? Object.keys(instance.slots) : []
+          };
+          
+          // 获取路由信息
+          if (instance?.$router && instance?.$route) {
+            vueContext.route = {
+              path: instance.$route.path,
+              name: instance.$route.name,
+              params: instance.$route.params,
+              query: instance.$route.query
+            };
+          }
+        } catch (e) {
+          vueContext = { error: 'Failed to extract Vue context' };
+        }
+
+        self.captureError({
+          type: 'vue3_error',
+          message: err.message,
+          stack: err.stack,
+          vueContext: vueContext,
+          vueVersion: vue.version,
+          timestamp: new Date().toISOString(),
+          pageUrl: typeof window !== 'undefined' ? window.location.href : ''
+        });
+
+        if (originalErrorHandler) {
+          originalErrorHandler.call(this, err, instance, info);
+        }
+      };
+      
+      if (this.config.debug) {
+        console.log('[ErrorCatcher] ✅ Vue 3 error handler integrated');
+      }
+    } else if (isVue2 && vue.config) {
+      // Vue 2 错误处理
       const originalErrorHandler = vue.config.errorHandler;
       
       vue.config.errorHandler = function(err, vm, info) {
-        // 收集 Vue 组件详细信息
         const vueContext = {
-          componentName: vm?.$options?.name || vm?.$.type?.name || 'Anonymous',
+          componentName: vm?.$options?.name || 'Anonymous',
           lifecycle: info,
           componentPath: vm?.$options?.__file,
-          props: self.safeStringify(vm?.$props),
-          data: self.safeStringify(vm?.$data),
+          props: self.sanitizeData(vm?.$props),
+          data: self.sanitizeData(vm?.$data),
           computed: vm?.$options?.computed ? Object.keys(vm.$options.computed) : [],
           methods: vm?.$options?.methods ? Object.keys(vm.$options.methods) : [],
           parentComponent: vm?.$parent?.$options?.name,
@@ -479,10 +639,11 @@ class ErrorCatcher {
         };
 
         self.captureError({
-          type: 'vue_error',
+          type: 'vue2_error',
           message: err.message,
           stack: err.stack,
           vueContext: vueContext,
+          vueVersion: vue.version,
           timestamp: new Date().toISOString(),
           pageUrl: typeof window !== 'undefined' ? window.location.href : ''
         });
@@ -491,21 +652,54 @@ class ErrorCatcher {
           originalErrorHandler.call(this, err, vm, info);
         }
       };
-
+      
       if (this.config.debug) {
-        console.log('[ErrorCatcher] ✅ Vue error handler integrated');
+        console.log('[ErrorCatcher] ✅ Vue 2 error handler integrated');
       }
     }
   }
 
   /**
-   * 集成 React
+   * 集成 React (提供错误边界组件)
    */
   integrateReact() {
-    // React 错误边界需要在组件层面实现
-    // 这里我们监听全局错误，React 错误会冒泡到全局
+    // 提供 React 错误边界组件
+    if (typeof window !== 'undefined' && window.React) {
+      const React = window.React;
+      
+      // 创建错误边界组件
+      class ErrorBoundary extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = { hasError: false };
+        }
+
+        static getDerivedStateFromError(error) {
+          return { hasError: true };
+        }
+
+        componentDidCatch(error, errorInfo) {
+          this.props.onError?.(error, errorInfo);
+        }
+
+        render() {
+          if (this.state.hasError) {
+            return this.props.fallback || null;
+          }
+          return this.props.children;
+        }
+      }
+      
+      // 挂载到全局
+      window.ReactErrorBoundary = ErrorBoundary;
+      
+      if (this.config.debug) {
+        console.log('[ErrorCatcher] ✅ React error boundary component created');
+      }
+    }
+    
     if (this.config.debug) {
-      console.log('[ErrorCatcher] ✅ React integration enabled (use Error Boundaries for component errors)');
+      console.log('[ErrorCatcher] ✅ React integration ready (use ErrorBoundary component)');
     }
   }
 
@@ -552,6 +746,21 @@ class ErrorCatcher {
         // 收集响应头
         const responseHeaders = response?.headers ? Object.assign({}, response.headers) : {};
 
+        let responseData = response?.data;
+        let responseSize = 0;
+        
+        if (responseData) {
+          try {
+            const responseStr = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+            responseSize = new Blob([responseStr]).size;
+            if (responseSize > self.config.maxResponseSize) {
+              responseData = self.truncate(responseStr, 5000);
+            }
+          } catch (e) {
+            responseData = '[Unable to stringify response]';
+          }
+        }
+
         self.captureError({
           type: response ? 'axios_error' : 'axios_network_error',
           url: fullUrl,
@@ -559,18 +768,19 @@ class ErrorCatcher {
           status: response?.status || 0,
           statusText: response?.statusText || error.message,
           message: error.message,
-          requestHeaders: config.headers,
-          requestBody: config.data,
+          requestHeaders: self.sanitizeData(config.headers),
+          requestBody: self.sanitizeData(config.data),
           responseHeaders: responseHeaders,
-          response: response?.data ? self.truncate(self.safeStringify(response.data), 2000) : undefined,
-          responseSize: response?.data ? new Blob([self.safeStringify(response.data)]).size : 0,
+          response: responseData ? self.truncate(self.safeStringify(responseData), 2000) : undefined,
+          responseSize: responseSize,
           duration: duration,
           timing: {
             startTime: config.metadata?.startTime,
             endTime: Date.now(),
             duration: duration
           },
-          curlCommand: self.generateCurlCommand(fullUrl, (config.method || 'GET').toUpperCase(), config.headers, config.data),
+          curlCommand: self.generateCurlCommand(fullUrl, (config.method || 'GET').toUpperCase(), 
+            self.sanitizeData(config.headers), self.sanitizeData(config.data)),
           timestamp: new Date().toISOString(),
           pageUrl: typeof window !== 'undefined' ? window.location.href : ''
         });
@@ -602,10 +812,11 @@ class ErrorCatcher {
         status: jqXHR.status,
         statusText: jqXHR.statusText,
         message: thrownError || jqXHR.statusText || `HTTP ${jqXHR.status} Error`,
-        requestHeaders: settings.headers,
-        requestBody: settings.data,
+        requestHeaders: self.sanitizeData(settings.headers),
+        requestBody: self.sanitizeData(settings.data),
         response: self.truncate(jqXHR.responseText, 2000),
-        curlCommand: self.generateCurlCommand(settings.url, (settings.type || 'GET').toUpperCase(), settings.headers, settings.data),
+        curlCommand: self.generateCurlCommand(settings.url, (settings.type || 'GET').toUpperCase(), 
+          self.sanitizeData(settings.headers), self.sanitizeData(settings.data)),
         timestamp: new Date().toISOString(),
         pageUrl: window.location.href
       });
@@ -620,10 +831,203 @@ class ErrorCatcher {
    * 集成路由
    */
   integrateRouter() {
-    // Vue Router, React Router 等的路由变化监听
-    // 可以通过 config.router 传入路由实例
+    const router = this.config.router;
+    if (!router) return;
+
+    const self = this;
+
+    // Vue Router
+    if (router.afterEach) {
+      router.afterEach((to, from) => {
+        this.addBreadcrumb({
+          category: 'navigation',
+          message: `Route changed: ${from?.path || 'unknown'} -> ${to?.path || 'unknown'}`,
+          data: { from, to }
+        });
+      });
+    }
+
+    // React Router 可以通过监听 history 变化
+    if (this.isBrowser && window.history) {
+      const originalPushState = history.pushState;
+      const originalReplaceState = history.replaceState;
+      
+      history.pushState = function(...args) {
+        self.addBreadcrumb({
+          category: 'navigation',
+          message: `History push state`,
+          data: { arguments: args }
+        });
+        return originalPushState.apply(this, args);
+      };
+      
+      history.replaceState = function(...args) {
+        self.addBreadcrumb({
+          category: 'navigation',
+          message: `History replace state`,
+          data: { arguments: args }
+        });
+        return originalReplaceState.apply(this, args);
+      };
+    }
+
     if (this.config.debug) {
       console.log('[ErrorCatcher] ✅ Router integration enabled');
+    }
+  }
+
+  /**
+   * 启动性能监控
+   */
+  startPerformanceMonitoring() {
+    if (!this.isBrowser) return;
+
+    // 监控页面加载性能
+    if (window.performance && window.performance.timing) {
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const timing = window.performance.timing;
+          const navigation = window.performance.navigation;
+          
+          if (timing.navigationStart) {
+            const metrics = {
+              type: 'performance_page_load',
+              dns: timing.domainLookupEnd - timing.domainLookupStart,
+              tcp: timing.connectEnd - timing.connectStart,
+              request: timing.responseStart - timing.requestStart,
+              response: timing.responseEnd - timing.responseStart,
+              dom: timing.domInteractive - timing.responseEnd,
+              domContentLoaded: timing.domContentLoadedEventEnd - timing.navigationStart,
+              load: timing.loadEventEnd - timing.navigationStart,
+              redirect: timing.redirectEnd - timing.redirectStart,
+              navigationType: navigation.type
+            };
+            
+            this.capturePerformance(metrics);
+          }
+        }, 0);
+      });
+    }
+    
+    // 监控资源加载性能
+    if (window.PerformanceObserver) {
+      try {
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (entry.entryType === 'resource') {
+              // 只记录慢资源
+              if (entry.duration > 1000) {
+                this.capturePerformance({
+                  type: 'performance_slow_resource',
+                  name: entry.name,
+                  duration: entry.duration,
+                  transferSize: entry.transferSize,
+                  initiatorType: entry.initiatorType
+                });
+              }
+            }
+          }
+        });
+        observer.observe({ entryTypes: ['resource'] });
+      } catch (e) {
+        // PerformanceObserver 不支持
+      }
+    }
+    
+    if (this.config.debug) {
+      console.log('[ErrorCatcher] ✅ Performance monitoring started');
+    }
+  }
+
+  /**
+   * 初始化离线存储 (IndexedDB)
+   */
+  async initOfflineStorage() {
+    if (!this.isBrowser || !window.indexedDB) return;
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('ErrorCatcherDB', 1);
+      
+      request.onerror = () => {
+        if (this.config.debug) {
+          console.warn('[ErrorCatcher] Failed to open IndexedDB');
+        }
+        reject();
+      };
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('errors')) {
+          const store = db.createObjectStore('errors', { 
+            keyPath: 'id', 
+            autoIncrement: true 
+          });
+          store.createIndex('timestamp', 'timestamp');
+        }
+      };
+      
+      request.onsuccess = (event) => {
+        this.offlineStorage = event.target.result;
+        if (this.config.debug) {
+          console.log('[ErrorCatcher] ✅ Offline storage initialized');
+        }
+        resolve();
+      };
+    });
+  }
+
+  /**
+   * 发送待处理的错误
+   */
+  async sendPendingErrors() {
+    if (!this.offlineStorage) return;
+    
+    const transaction = this.offlineStorage.transaction(['errors'], 'readonly');
+    const store = transaction.objectStore('errors');
+    const request = store.getAll();
+    
+    request.onsuccess = async () => {
+      const pendingErrors = request.result;
+      if (pendingErrors.length > 0) {
+        if (this.config.debug) {
+          console.log(`[ErrorCatcher] Found ${pendingErrors.length} pending errors`);
+        }
+        
+        try {
+          await this.sendToServer(pendingErrors);
+          
+          // 发送成功，清除缓存
+          const clearTransaction = this.offlineStorage.transaction(['errors'], 'readwrite');
+          const clearStore = clearTransaction.objectStore('errors');
+          clearStore.clear();
+        } catch (error) {
+          if (this.config.debug) {
+            console.warn('[ErrorCatcher] Failed to send pending errors');
+          }
+        }
+      }
+    };
+  }
+
+  /**
+   * 存储错误到 IndexedDB
+   */
+  async storeErrorsToIndexedDB(errors) {
+    if (!this.offlineStorage) return;
+    
+    const transaction = this.offlineStorage.transaction(['errors'], 'readwrite');
+    const store = transaction.objectStore('errors');
+    
+    for (const error of errors) {
+      store.add({
+        ...error,
+        timestamp: new Date().toISOString(),
+        storedAt: Date.now()
+      });
+    }
+    
+    if (this.config.debug) {
+      console.log(`[ErrorCatcher] Stored ${errors.length} errors to offline storage`);
     }
   }
 
@@ -636,33 +1040,60 @@ class ErrorCatcher {
       return;
     }
 
+    // 错误去重
+    if (this.config.enableDeduplication) {
+      const fingerprint = this.generateFingerprint(errorData);
+      const now = Date.now();
+      const lastError = this.lastErrors.get(fingerprint);
+      
+      if (lastError && (now - lastError) < this.config.deduplicationTimeout) {
+        if (this.config.debug) {
+          console.log('[ErrorCatcher] Duplicate error suppressed:', fingerprint);
+        }
+        return;
+      }
+      
+      this.lastErrors.set(fingerprint, now);
+      
+      // 清理过期的指纹
+      if (this.lastErrors.size > 100) {
+        const cutoff = now - 60000;
+        for (const [key, time] of this.lastErrors.entries()) {
+          if (time < cutoff) {
+            this.lastErrors.delete(key);
+          }
+        }
+      }
+    }
+
+    // 敏感信息过滤
+    const sanitizedError = this.sanitizeData(errorData);
+
     // beforeSend 钩子
     if (this.config.beforeSend) {
-      const modified = this.config.beforeSend(errorData);
+      const modified = this.config.beforeSend(sanitizedError);
       if (modified === false) return;
-      if (modified) errorData = modified;
+      if (modified) sanitizedError = modified;
     }
 
     // 添加浏览器信息和用户设置的数据
     const enrichedError = {
-      ...errorData,
+      ...sanitizedError,
       projectId: this.config.projectId,
       apiKey: this.config.apiKey,
       environment: this.config.environment,
       release: this.config.release,
-      ...(this.isBrowser && !errorData.userAgent ? { userAgent: navigator.userAgent } : {}),
-      ...(this.isBrowser && !errorData.pageUrl ? { pageUrl: window.location.href } : {}),
-      // 添加详细的浏览器和 DOM 信息
+      ...(this.isBrowser && !sanitizedError.userAgent ? { userAgent: navigator.userAgent } : {}),
+      ...(this.isBrowser && !sanitizedError.pageUrl ? { pageUrl: window.location.href } : {}),
       ...(this.isBrowser ? { 
         dom: this.captureDOMState(),
         browser: this.collectBrowserInfo(),
         network: this.collectNetworkInfo()
       } : {}),
-      // 添加用户设置的数据
       ...(this.config.user ? { user: this.config.user } : {}),
-      ...(this.config.tags ? { tags: { ...this.config.tags, ...errorData.tags } } : {}),
-      ...(this.config.contexts ? { contexts: { ...this.config.contexts, ...errorData.contexts } } : {}),
-      ...(this.config.extra ? { extra: { ...this.config.extra, ...errorData.extra } } : {}),
+      ...(this.config.tags ? { tags: { ...this.config.tags, ...sanitizedError.tags } } : {}),
+      ...(this.config.contexts ? { contexts: { ...this.config.contexts, ...sanitizedError.contexts } } : {}),
+      ...(this.config.extra ? { extra: { ...this.config.extra, ...sanitizedError.extra } } : {}),
       ...(this.config.breadcrumbs && this.config.breadcrumbs.length > 0 ? { breadcrumbs: [...this.config.breadcrumbs] } : {})
     };
 
@@ -679,6 +1110,58 @@ class ErrorCatcher {
     // 立即发送或批量发送
     if (this.errorQueue.length >= this.config.maxBatchSize) {
       this.sendBatch();
+    }
+  }
+
+  /**
+   * 捕获性能数据
+   */
+  capturePerformance(metrics) {
+    this.captureError({
+      type: 'performance',
+      ...metrics,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * 生成错误指纹
+   */
+  generateFingerprint(errorData) {
+    const str = `${errorData.type}|${errorData.message}|${errorData.url || ''}|${errorData.lineno || ''}|${errorData.colno || ''}|${errorData.status || ''}`;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash.toString();
+  }
+
+  /**
+   * 敏感信息过滤
+   */
+  sanitizeData(data) {
+    if (!data || typeof data !== 'object') return data;
+    
+    try {
+      const sanitized = JSON.parse(JSON.stringify(data));
+      const sanitize = (obj) => {
+        if (!obj || typeof obj !== 'object') return;
+        
+        for (const key of Object.keys(obj)) {
+          const lowerKey = key.toLowerCase();
+          if (this.config.sensitiveKeys.some(sk => lowerKey.includes(sk))) {
+            obj[key] = '[REDACTED]';
+          } else if (typeof obj[key] === 'object') {
+            sanitize(obj[key]);
+          }
+        }
+      };
+      
+      sanitize(sanitized);
+      return sanitized;
+    } catch (e) {
+      return data;
     }
   }
 
@@ -813,7 +1296,7 @@ class ErrorCatcher {
       let itemCount = 0;
       for (let key in storage) {
         if (storage.hasOwnProperty(key)) {
-          size += storage[key].length + key.length;
+          size += (storage[key]?.length || 0) + (key?.length || 0);
           itemCount++;
         }
       }
@@ -827,10 +1310,12 @@ class ErrorCatcher {
    * 手动上报错误
    */
   report(error, context = {}) {
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    
     this.captureError({
       type: context.type || 'manual',
-      message: error.message,
-      stack: error.stack,
+      message: errorObj.message,
+      stack: errorObj.stack,
       status: context.status || 0,
       statusText: context.statusText || 'Manual Error',
       url: context.url,
@@ -872,6 +1357,9 @@ class ErrorCatcher {
           this.isSending = false;
           this.sendBatch();
         }, 1000 * this.retryCount);
+      } else if (this.config.enableOfflineStorage && this.offlineStorage) {
+        // 重试失败，存储到离线存储
+        await this.storeErrorsToIndexedDB(batch);
       }
     } finally {
       this.isSending = false;
@@ -885,14 +1373,17 @@ class ErrorCatcher {
     const payload = {
       errors: errors,
       batchSize: errors.length,
-      sentAt: new Date().toISOString()
+      sentAt: new Date().toISOString(),
+      sdk: {
+        name: 'ErrorCatcher',
+        version: '2.0.0'
+      }
     };
 
     if (this.config.debug) {
       console.log('[ErrorCatcher] Sending to server:', {
         url: this.config.reportUrl,
-        errorCount: errors.length,
-        payload: JSON.stringify(payload, null, 2)
+        errorCount: errors.length
       });
     }
 
@@ -916,12 +1407,7 @@ class ErrorCatcher {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[ErrorCatcher] Server error:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       return await response.json();
@@ -951,7 +1437,7 @@ class ErrorCatcher {
    * 启动批量发送定时器
    */
   startBatchSender() {
-    setInterval(() => {
+    this.batchSenderInterval = setInterval(() => {
       if (this.errorQueue.length > 0 && !this.isSending) {
         this.sendBatch();
       }
@@ -1018,8 +1504,8 @@ class ErrorCatcher {
     // 添加请求头
     if (headers && typeof headers === 'object') {
       for (const [key, value] of Object.entries(headers)) {
-        // 跳过一些不必要的头
-        if (['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
+        // 跳过一些不必要的头和敏感信息
+        if (['host', 'connection', 'content-length', 'authorization', 'cookie'].includes(key.toLowerCase())) {
           continue;
         }
         curl += ` \\\n  -H '${key}: ${value}'`;
@@ -1030,7 +1516,11 @@ class ErrorCatcher {
     if (body) {
       let bodyStr = body;
       if (typeof body === 'object') {
-        bodyStr = JSON.stringify(body);
+        try {
+          bodyStr = JSON.stringify(body);
+        } catch (e) {
+          bodyStr = String(body);
+        }
       }
       // 转义单引号
       bodyStr = bodyStr.replace(/'/g, "'\\''");
@@ -1044,7 +1534,6 @@ class ErrorCatcher {
    * 设置用户信息
    */
   setUser(user) {
-    if (!this.config) this.config = {};
     this.config.user = user;
     
     if (this.config.debug) {
@@ -1056,7 +1545,6 @@ class ErrorCatcher {
    * 设置单个标签
    */
   setTag(key, value) {
-    if (!this.config) this.config = {};
     if (!this.config.tags) this.config.tags = {};
     this.config.tags[key] = value;
     
@@ -1069,7 +1557,6 @@ class ErrorCatcher {
    * 批量设置标签
    */
   setTags(tags) {
-    if (!this.config) this.config = {};
     if (!this.config.tags) this.config.tags = {};
     Object.assign(this.config.tags, tags);
     
@@ -1082,7 +1569,6 @@ class ErrorCatcher {
    * 设置上下文
    */
   setContext(key, value) {
-    if (!this.config) this.config = {};
     if (!this.config.contexts) this.config.contexts = {};
     this.config.contexts[key] = value;
     
@@ -1095,7 +1581,6 @@ class ErrorCatcher {
    * 设置额外数据
    */
   setExtra(key, value) {
-    if (!this.config) this.config = {};
     if (!this.config.extra) this.config.extra = {};
     this.config.extra[key] = value;
     
@@ -1108,7 +1593,6 @@ class ErrorCatcher {
    * 添加面包屑
    */
   addBreadcrumb(breadcrumb) {
-    if (!this.config) this.config = {};
     if (!this.config.breadcrumbs) this.config.breadcrumbs = [];
     
     const crumb = {
@@ -1116,12 +1600,12 @@ class ErrorCatcher {
       category: breadcrumb.category || 'default',
       message: breadcrumb.message || '',
       level: breadcrumb.level || 'info',
-      data: breadcrumb.data || {}
+      data: this.sanitizeData(breadcrumb.data || {})
     };
     
-    // 限制面包屑数量，保留最近的100条
+    // 限制面包屑数量
     this.config.breadcrumbs.push(crumb);
-    if (this.config.breadcrumbs.length > 100) {
+    if (this.config.breadcrumbs.length > this.config.maxBreadcrumbs) {
       this.config.breadcrumbs.shift();
     }
     
@@ -1131,15 +1615,64 @@ class ErrorCatcher {
   }
 
   /**
+   * 获取配置
+   */
+  getConfig() {
+    return { ...this.config };
+  }
+
+  /**
+   * 获取队列状态
+   */
+  getQueueStatus() {
+    return {
+      queueLength: this.errorQueue.length,
+      isSending: this.isSending,
+      retryCount: this.retryCount,
+      lastErrorsSize: this.lastErrors.size
+    };
+  }
+
+  /**
+   * 清空队列
+   */
+  clearQueue() {
+    this.errorQueue = [];
+    this.lastErrors.clear();
+    
+    if (this.config.debug) {
+      console.log('[ErrorCatcher] Queue cleared');
+    }
+  }
+
+  /**
    * 销毁
    */
   destroy() {
     if (!this.isBrowser) return;
 
+    // 清理定时器
+    if (this.batchSenderInterval) {
+      clearInterval(this.batchSenderInterval);
+      this.batchSenderInterval = null;
+    }
+    
+    // 清理事件监听
+    window.removeEventListener('error', this.globalErrorHandler);
+    window.removeEventListener('unhandledrejection', this.promiseRejectionHandler);
+
     // 恢复原始方法
-    window.fetch = this.originalMethods.fetch;
-    XMLHttpRequest.prototype.open = this.originalMethods.xhrOpen;
-    XMLHttpRequest.prototype.send = this.originalMethods.xhrSend;
+    if (this.originalMethods) {
+      window.fetch = this.originalMethods.fetch;
+      XMLHttpRequest.prototype.open = this.originalMethods.xhrOpen;
+      XMLHttpRequest.prototype.send = this.originalMethods.xhrSend;
+    }
+
+    // 关闭 IndexedDB 连接
+    if (this.offlineStorage) {
+      this.offlineStorage.close();
+      this.offlineStorage = null;
+    }
 
     this.initialized = false;
 
