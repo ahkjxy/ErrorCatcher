@@ -135,7 +135,19 @@ const errorSchema = new mongoose.Schema({
   },
   resolvedAt: Date,
   resolvedBy: String,
-  notes: String
+  notes: String,
+
+  // 错误来源标记
+  offlineCached: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  deduplicated: {
+    type: Boolean,
+    default: false,
+    index: true
+  }
 }, {
   timestamps: true
 });

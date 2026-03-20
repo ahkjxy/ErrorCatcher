@@ -213,6 +213,10 @@ const sanitizeErrorData = (error) => {
     sanitized.level = 'error';
   }
 
+  // 确保offlineCached和deduplicated是布尔值
+  sanitized.offlineCached = Boolean(sanitized.offlineCached);
+  sanitized.deduplicated = Boolean(sanitized.deduplicated);
+
   return sanitized;
 };
 
