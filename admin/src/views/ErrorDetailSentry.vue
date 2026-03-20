@@ -442,6 +442,112 @@
             </div>
           </div>
 
+          <!-- Detailed Performance Metrics -->
+          <div v-if="error.browser && error.browser.performance && hasDetailedPerformance(error.browser.performance)" class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-4 border border-blue-200">
+            <h3 class="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              {{ t('errors.performanceDetails') }}
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div v-if="error.browser.performance.dns" class="bg-white rounded p-2 text-center">
+                <div class="text-xs text-gray-500">{{ t('errors.dnsLookup') }}</div>
+                <div class="text-sm font-semibold" :class="error.browser.performance.dns > 100 ? 'text-red-600' : 'text-green-600'">
+                  {{ error.browser.performance.dns }}ms
+                </div>
+              </div>
+              <div v-if="error.browser.performance.tcp" class="bg-white rounded p-2 text-center">
+                <div class="text-xs text-gray-500">{{ t('errors.tcpConnect') }}</div>
+                <div class="text-sm font-semibold" :class="error.browser.performance.tcp > 200 ? 'text-red-600' : 'text-green-600'">
+                  {{ error.browser.performance.tcp }}ms
+                </div>
+              </div>
+              <div v-if="error.browser.performance.request" class="bg-white rounded p-2 text-center">
+                <div class="text-xs text-gray-500">{{ t('errors.requestTime') }}</div>
+                <div class="text-sm font-semibold" :class="error.browser.performance.request > 500 ? 'text-red-600' : 'text-green-600'">
+                  {{ error.browser.performance.request }}ms
+                </div>
+              </div>
+              <div v-if="error.browser.performance.response" class="bg-white rounded p-2 text-center">
+                <div class="text-xs text-gray-500">{{ t('errors.responseTime') }}</div>
+                <div class="text-sm font-semibold" :class="error.browser.performance.response > 500 ? 'text-red-600' : 'text-green-600'">
+                  {{ error.browser.performance.response }}ms
+                </div>
+              </div>
+              <div v-if="error.browser.performance.dom" class="bg-white rounded p-2 text-center">
+                <div class="text-xs text-gray-500">{{ t('errors.domParse') }}</div>
+                <div class="text-sm font-semibold" :class="error.browser.performance.dom > 500 ? 'text-red-600' : 'text-green-600'">
+                  {{ error.browser.performance.dom }}ms
+                </div>
+              </div>
+              <div v-if="error.browser.performance.redirect" class="bg-white rounded p-2 text-center">
+                <div class="text-xs text-gray-500">{{ t('errors.redirectTime') }}</div>
+                <div class="text-sm font-semibold" :class="error.browser.performance.redirect > 0 ? 'text-yellow-600' : 'text-green-600'">
+                  {{ error.browser.performance.redirect }}ms
+                </div>
+              </div>
+              <div v-if="error.browser.performance.navigationType !== undefined" class="bg-white rounded p-2 text-center col-span-2">
+                <div class="text-xs text-gray-500">{{ t('errors.navigationType') }}</div>
+                <div class="text-sm font-semibold text-gray-900 capitalize">
+                  {{ getNavigationTypeLabel(error.browser.performance.navigationType) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slow Resources -->
+          <div v-if="error.browser && error.browser.performance && error.browser.performance.slowResources && error.browser.performance.slowResources.length > 0" class="bg-orange-50 rounded p-4 border border-orange-200">
+            <h3 class="text-sm font-semibold text-orange-900 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {{ t('errors.slowResources') }} ({{ error.browser.performance.slowResources.length }})
+            </h3>
+            <div class="space-y-2">
+              <div v-for="(resource, index) in error.browser.performance.slowResources" :key="index" class="bg-white rounded p-3 border border-orange-100">
+                <div class="flex justify-between items-start gap-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-xs text-gray-500">{{ t('errors.resourceName') }}</div>
+                    <div class="text-sm text-gray-900 truncate font-mono">{{ resource.name }}</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-xs text-gray-500">{{ t('errors.duration') }}</div>
+                    <div class="text-sm font-bold text-red-600">{{ resource.duration }}ms</div>
+                  </div>
+                </div>
+                <div class="flex gap-4 mt-2">
+                  <div v-if="resource.initiatorType">
+                    <span class="text-xs text-gray-500">{{ t('errors.resourceType') }}:</span>
+                    <span class="text-xs text-gray-700 capitalize">{{ resource.initiatorType }}</span>
+                  </div>
+                  <div v-if="resource.transferSize">
+                    <span class="text-xs text-gray-500">{{ t('errors.transferSize') }}:</span>
+                    <span class="text-xs text-gray-700">{{ formatBytes(resource.transferSize) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Offline & Deduplication Status -->
+          <div class="flex gap-2 flex-wrap">
+            <div v-if="error.offlineCached" class="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+              </svg>
+              {{ t('errors.offlineCached') }}
+              <span class="text-blue-600" :title="t('errors.offlineCachedDesc')">?</span>
+            </div>
+            <div v-if="error.deduplicated" class="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              {{ t('errors.deduplicated') }}
+              <span class="text-purple-600" :title="t('errors.deduplicatedDesc')">?</span>
+            </div>
+          </div>
+
           <!-- Connection Information -->
           <div v-if="error.browser && error.browser.connection" class="bg-gray-50 rounded p-4">
             <h3 class="text-sm font-semibold text-gray-900 mb-3">{{ t('errors.connection') }}</h3>
@@ -866,6 +972,29 @@ const copyRawData = async () => {
   } catch (err) {
     showToast(t('errors.copyFailed'), 'error');
   }
+};
+
+const hasDetailedPerformance = (performance) => {
+  return performance.dns || performance.tcp || performance.request || 
+         performance.response || performance.dom || performance.redirect !== undefined;
+};
+
+const getNavigationTypeLabel = (type) => {
+  const labels = {
+    0: 'Navigate',
+    1: 'Reload',
+    2: 'Back Forward',
+    255: 'Reserved'
+  };
+  return labels[type] || type;
+};
+
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 onMounted(() => {

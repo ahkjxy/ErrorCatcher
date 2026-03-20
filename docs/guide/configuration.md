@@ -325,6 +325,131 @@ import fetch from 'node-fetch';
 }
 ```
 
+## 性能监控配置
+
+### enablePerformanceMonitoring
+
+- 类型: `boolean`
+- 默认值: `true`
+
+是否启用性能监控。启用后会自动追踪页面加载和资源性能数据。
+
+```javascript
+{
+  enablePerformanceMonitoring: true
+}
+```
+
+启用后会自动捕获以下性能指标：
+- 页面加载时间（DOMContentLoaded, load, first-byte）
+- 资源加载时间（图片、脚本、样式表等）
+- Performance Observer 数据
+
+### maxBreadcrumbs
+
+- 类型: `number`
+- 默认值: `100`
+
+面包屑最大记录数量。超过后会自动清理最早的记录。
+
+```javascript
+{
+  maxBreadcrumbs: 50
+}
+```
+
+## 离线存储配置
+
+### enableOfflineStorage
+
+- 类型: `boolean`
+- 默认值: `true`
+
+是否启用离线存储。当网络不可用时，错误会自动缓存到 IndexedDB，恢复网络后自动上报。
+
+```javascript
+{
+  enableOfflineStorage: true
+}
+```
+
+::: tip
+离线存储基于 IndexedDB实现，无需担心浏览器兼容性（IE 10+ 支持）。
+:::
+
+## 错误去重配置
+
+### enableDeduplication
+
+- 类型: `boolean`
+- 默认值: `false`
+
+是否启用错误去重。启用后，短时间内相同的错误不会重复上报。
+
+```javascript
+{
+  enableDeduplication: true
+}
+```
+
+### deduplicationTimeout
+
+- 类型: `number`
+- 默认值: `5000`
+
+错误去重的时间窗口（毫秒）。在该时间内的相同错误只会上报一次。
+
+```javascript
+{
+  enableDeduplication: true,
+  deduplicationTimeout: 3000 // 3秒内的相同错误只上报一次
+}
+```
+
+## 敏感信息过滤配置
+
+### sensitiveKeys
+
+- 类型: `Array<string>`
+- 默认值: `['password', 'token', 'secret', 'authorization', 'cookie', 'passwd', 'api_key', 'apikey', 'credit_card']`
+
+自动过滤的敏感字段关键词。匹配到的字段值会被替换为 `***`。
+
+```javascript
+{
+  sensitiveKeys: [
+    'password',
+    'token',
+    'secret',
+    'authorization',
+    'cookie',
+    'api_key',
+    'credit_card',
+    'ssn',  // 社会安全号
+    'cvv'   // 信用卡验证码
+  ]
+}
+```
+
+::: tip
+敏感信息过滤会自动扫描请求体、响应体、URL参数和请求头，无需手动配置。
+:::
+
+## 网络请求限制配置
+
+### maxResponseSize
+
+- 类型: `number`
+- 默认值: `1048576` (1MB)
+
+响应体最大捕获大小（字节）。超过限制的响应会被截断。
+
+```javascript
+{
+  maxResponseSize: 512 * 1024 // 限制为 512KB
+}
+```
+
 ## 完整配置示例
 
 ```javascript
@@ -363,9 +488,25 @@ const tracker = new ErrorCatcher({
     /\.(jpg|png|gif)$/i
   ],
   
+  // 性能监控
+  enablePerformanceMonitoring: true,
+  maxBreadcrumbs: 100,
+  
+  // 离线存储
+  enableOfflineStorage: true,
+  
+  // 错误去重
+  enableDeduplication: true,
+  deduplicationTimeout: 5000,
+  
+  // 敏感信息过滤
+  sensitiveKeys: ['password', 'token', 'secret', 'api_key'],
+  
+  // 网络请求限制
+  maxResponseSize: 1024 * 1024,
+  
   // 钩子函数
   beforeSend(error) {
-    // 过滤敏感信息
     if (error.url?.includes('sensitive')) {
       return false;
     }
@@ -376,7 +517,6 @@ const tracker = new ErrorCatcher({
     console.log('Error captured:', error);
   }
 });
-```
 
 ## 环境变量配置
 
@@ -431,11 +571,28 @@ ErrorCatcher 会自动捕获以下信息，无需在配置中手动添加：
 ### 时间信息自动捕获
 - `timestamp` - 错误发生时间（ISO 8601 格式）
 
+### 性能数据自动捕获
+- `performance` - 性能监控数据
+  - `pageLoadTime` - 页面加载时间
+  - `domContentLoaded` - DOM 内容加载时间
+  - `firstByte` - 首字节时间
+  - `resources` - 资源加载详情数组
+    - `name` - 资源名称/URL
+    - `type` - 资源类型（script, link, img 等）
+    - `duration` - 加载耗时
+    - `size` - 资源大小
+
 ### 配置信息自动添加
 - `projectId` - 项目 ID
 - `apiKey` - API 密钥
 - `environment` - 环境
 - `release` - 版本号
+
+### 面包屑自动记录
+- `breadcrumbs` - 用户操作轨迹
+  - 自动记录页面点击、输入、路由变化
+  - 自动记录控制台操作
+  - 可通过 `maxBreadcrumbs` 配置最大数量
 
 ::: tip
 由于这些信息会自动捕获，在手动上报错误时无需重复添加。

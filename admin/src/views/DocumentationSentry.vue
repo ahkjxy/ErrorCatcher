@@ -68,11 +68,14 @@ yarn add error-catcher</code></pre>
 const tracker = new ErrorCatcher({
   reportUrl: 'http://your-api.com/errors/report',
   projectId: 'your-project-id',
+  apiKey: 'your-api-key',
   environment: 'production'
-});
-
-tracker.init();</code></pre>
+});</code></pre>
               </div>
+              <p class="text-sm text-gray-500 mt-2">
+                <span v-if="locale === 'zh'">自动启动，无需手动调用 init()。可通过 autoStart: false 禁用。</span>
+                <span v-else>Auto-initializes, no need to call init(). Disable with autoStart: false.</span>
+              </p>
             </section>
           </div>
         </div>
@@ -1261,8 +1264,100 @@ try {
   // Advanced
   ignoreUrls: [],          // URLs to ignore
   beforeSend: (error) => error,  // Modify error
-  onError: (error) => {}   // Error callback
+  onError: (error) => {},   // Error callback
+  
+  // Performance & Monitoring
+  enablePerformanceMonitoring: true,  // Enable performance tracking
+  maxBreadcrumbs: 100,                 // Max breadcrumbs to capture
+  
+  // Offline Storage
+  enableOfflineStorage: true,           // Cache errors offline
+  
+  // Deduplication
+  enableDeduplication: true,           // Prevent duplicate reports
+  deduplicationTimeout: 5000,           // Deduplication window (ms)
+  
+  // Security
+  sensitiveKeys: ['password', 'token', 'api_key'],  // Auto-mask sensitive data
+  maxResponseSize: 1048576               // Max response size (1MB)
 }</code></pre>
+            </section>
+
+            <section>
+              <h2 class="text-2xl font-semibold text-gray-900 mb-3">
+                <span v-if="locale === 'zh'">高级功能</span>
+                <span v-else>Advanced Features</span>
+              </h2>
+              <div class="space-y-4">
+                <div class="border border-green-200 bg-green-50 rounded p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">📊</span>
+                    <h3 class="font-semibold text-green-900">
+                      <span v-if="locale === 'zh'">性能监控</span>
+                      <span v-else>Performance Monitoring</span>
+                    </h3>
+                  </div>
+                  <p class="text-sm text-green-800">
+                    <span v-if="locale === 'zh'">自动追踪页面加载时间、资源加载性能，支持 Performance Observer API。</span>
+                    <span v-else>Auto-track page load time, resource loading performance with Performance Observer API.</span>
+                  </p>
+                </div>
+                
+                <div class="border border-blue-200 bg-blue-50 rounded p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">💾</span>
+                    <h3 class="font-semibold text-blue-900">
+                      <span v-if="locale === 'zh'">离线存储</span>
+                      <span v-else>Offline Storage</span>
+                    </h3>
+                  </div>
+                  <p class="text-sm text-blue-800">
+                    <span v-if="locale === 'zh'">基于 IndexedDB 实现网络离线时自动缓存错误，网络恢复后自动上报。</span>
+                    <span v-else>Cache errors offline with IndexedDB, auto-retry when network recovers.</span>
+                  </p>
+                </div>
+                
+                <div class="border border-purple-200 bg-purple-50 rounded p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">🔁</span>
+                    <h3 class="font-semibold text-purple-900">
+                      <span v-if="locale === 'zh'">错误去重</span>
+                      <span v-else>Error Deduplication</span>
+                    </h3>
+                  </div>
+                  <p class="text-sm text-purple-800">
+                    <span v-if="locale === 'zh'">短时间内相同错误自动合并，避免重复告警。可配置去重时间窗口。</span>
+                    <span v-else>Automatically merge duplicate errors within a time window to avoid alert fatigue.</span>
+                  </p>
+                </div>
+                
+                <div class="border border-orange-200 bg-orange-50 rounded p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">🔒</span>
+                    <h3 class="font-semibold text-orange-900">
+                      <span v-if="locale === 'zh'">敏感信息过滤</span>
+                      <span v-else> Sensitive Data Masking</span>
+                    </h3>
+                  </div>
+                  <p class="text-sm text-orange-800">
+                    <span v-if="locale === 'zh'">自动过滤密码、Token、API Key 等敏感信息，支持自定义关键词。</span>
+                    <span v-else>Auto-mask passwords, tokens, API keys with customizable keywords.</span>
+                  </p>
+                </div>
+                
+                <div class="border border-gray-200 bg-gray-50 rounded p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">🍞</span>
+                    <h3 class="font-semibold text-gray-900">
+                      <span v-if="locale === 'zh'">面包屑导航</span>
+                      <span v-else>Breadcrumbs</span>
+                    </h3>
+                  </div>
+                  <p class="text-sm text-gray-800">
+                    <span v-if="locale === 'zh'">自动记录用户操作轨迹，包括点击、输入、路由变化等信息。</span>
+                    <span v-else>Auto-capture user journey including clicks, inputs, route changes.</span>
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -1270,11 +1365,13 @@ try {
               <h2 class="text-2xl font-semibold text-gray-900 mb-3">Framework Integration</h2>
               <p class="text-gray-700 mb-4">ErrorCatcher supports various frameworks:</p>
               <ul class="list-disc list-inside space-y-2 text-gray-700">
-                <li>Vue.js 2 & 3</li>
+                <li>Vue.js 2 & 3 (including Composition API)</li>
                 <li>React</li>
                 <li>Next.js</li>
                 <li>Nuxt.js 2 & 3</li>
+                <li>jQuery</li>
                 <li>Vanilla JavaScript</li>
+                <li>SSR / Node.js</li>
               </ul>
             </section>
           </div>
