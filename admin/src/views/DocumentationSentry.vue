@@ -1281,6 +1281,7 @@ try {
   sensitiveKeys: ['password', 'token', 'api_key'],  // Auto-mask sensitive data
   maxResponseSize: 1048576               // Max response size (1MB)
 }</code></pre>
+              </div>
             </section>
 
             <section>
