@@ -561,6 +561,11 @@ const getUserDisplay = (user) => {
 };
 
 const getStatusText = (status) => {
+  const text = t(`issues.statusText.${status}`);
+  if (text && text !== `issues.statusText.${status}`) {
+    return text;
+  }
+  // fallback: 保持老逻辑从英文状态映射
   const statusTexts = {
     200: 'OK',
     201: 'Created',

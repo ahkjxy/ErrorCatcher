@@ -66,12 +66,17 @@ fi
 
 echo ""
 
+# 获取本机IP地址
+LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+
 # 显示启动信息
 echo -e "${BLUE}[4/5]${NC} 准备启动服务..."
 echo ""
-echo "  📊 API 服务:      http://localhost:3001"
-echo "  🎨 管理后台:      http://localhost:3000"
-echo "  📖 文档站点:      http://localhost:5173"
+echo "  📊 API 服务:      http://localhost:3001 或 http://${LOCAL_IP}:3001"
+echo "  🎨 管理后台:      http://localhost:3000 或 http://${LOCAL_IP}:3000"
+echo "  📖 文档站点:      http://localhost:5173 或 http://${LOCAL_IP}:5173"
+echo ""
+echo "  💡 提示: 现在支持通过 IP 地址访问所有服务"
 echo ""
 
 # 启动服务

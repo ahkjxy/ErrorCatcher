@@ -126,15 +126,15 @@ app.use((req, res) => {
 });
 
 // 启动服务器
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(50));
   console.log(`✅ Error Catcher API running`);
   console.log(`📊 Environment: ${config.env}`);
   console.log(`🚀 Port: ${PORT}`);
   console.log(`🗄️  Database: MongoDB`);
-  console.log(`🔗 Health: http://localhost:${PORT}/health`);
+  console.log(`🔗 Health: http://0.0.0.0:${PORT}/health`);
   if (config.env !== 'prod') {
-    console.log(`ℹ️  Info: http://localhost:${PORT}/info`);
+    console.log(`ℹ️  Info: http://0.0.0.0:${PORT}/info`);
   }
   console.log('='.repeat(50));
   

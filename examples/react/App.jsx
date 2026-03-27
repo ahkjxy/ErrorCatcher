@@ -10,7 +10,9 @@ function TestComponent() {
   
   const triggerApiError = async () => {
     try {
-      await fetch('http://localhost:3001/api/test-error');
+      // 使用环境变量或默认localhost，生产环境请配置为实际IP
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      await fetch(`${apiUrl}/api/test-error`);
     } catch (error) {
       tracker.report(error, {
         component: 'TestComponent',
@@ -29,9 +31,12 @@ function TestComponent() {
 }
 
 function App() {
+  // 使用环境变量或默认localhost，生产环境请配置为实际IP
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+  
   return (
     <ErrorBoundary
-      reportUrl="http://localhost:3001/api/errors/report"
+      reportUrl={`${apiUrl}/api/errors/report`}
       projectId="69a69b5a6b650638ebe3d896"
       apiKey="ec_af9d006b050643d3bd21b39984a4a8172557279feac2d4e95005dfc997ecdf37"
       environment="development"

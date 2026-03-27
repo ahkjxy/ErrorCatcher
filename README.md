@@ -136,8 +136,8 @@ npm run dev
 ```
 
 6. **Access the application**
-- Admin Dashboard: http://localhost:3000
-- API Server: http://localhost:3001
+- Admin Dashboard: http://localhost:3000 (or your LAN IP: http://192.168.x.x:3000)
+- API Server: http://localhost:3001 (or your LAN IP: http://192.168.x.x:3001)
 - Default credentials: admin / admin123
 
 
@@ -157,8 +157,8 @@ docker-compose up -d
 ```
 
 3. **Access the application**
-- Admin Dashboard: http://localhost:3000
-- API Server: http://localhost:3001
+- Admin Dashboard: http://localhost:3000 (or your LAN IP: http://192.168.x.x:3000)
+- API Server: http://localhost:3001 (or your LAN IP: http://192.168.x.x:3001)
 - MongoDB: localhost:27017
 
 ### Services Included
@@ -187,7 +187,7 @@ import ErrorCatcher from 'error-catcher-sdk';
 
 // Initialize
 const errorCatcher = new ErrorCatcher({
-  reportUrl: 'http://localhost:3001/api/errors/report',
+  reportUrl: 'http://localhost:3001/api/errors/report', // Change to your server IP for LAN access: 'http://192.168.x.x:3001/api/errors/report'
   apiKey: 'your-project-api-key',
   projectId: 'your-project-id',
   environment: 'production',
@@ -213,7 +213,7 @@ try {
 ```javascript
 new ErrorCatcher({
   // Required
-  reportUrl: 'http://localhost:3001/api/errors/report',  // Error reporting endpoint
+  reportUrl: 'http://localhost:3001/api/errors/report',  // Error reporting endpoint (change to your server IP for LAN access)
   apiKey: 'your-api-key',                                 // Project API key
   projectId: 'your-project-id',                           // Project ID
   
@@ -259,7 +259,7 @@ const app = createApp(App);
 
 // Initialize with Vue instance
 new ErrorCatcher({
-  reportUrl: 'http://localhost:3001/api/errors/report',
+  reportUrl: 'http://localhost:3001/api/errors/report', // Change to your server IP for LAN access
   apiKey: 'your-api-key',
   projectId: 'your-project-id',
   vue: app,  // Pass Vue instance
@@ -275,7 +275,7 @@ import Vue from 'vue';
 import ErrorCatcher from 'error-catcher-sdk';
 
 new ErrorCatcher({
-  reportUrl: 'http://localhost:3001/api/errors/report',
+  reportUrl: 'http://localhost:3001/api/errors/report', // Change to your server IP for LAN access
   apiKey: 'your-api-key',
   projectId: 'your-project-id',
   vue: Vue,  // Pass Vue constructor
